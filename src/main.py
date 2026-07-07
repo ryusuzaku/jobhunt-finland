@@ -146,12 +146,12 @@ def save_preferences(
     set_preferences(db, updates)
 
     # Re-score existing jobs in the background so the save request returns instantly.
-    asyncio.get_event_loop().create_task(_rescore_all_jobs_in_background())
+    scheduler.add_job(_rescore_all_jobs)
 
     return RedirectResponse(url="/", status_code=303)
 
 
-async def _rescore_all_jobs_in_background():
+async def _rescore_all_jobs():
     """Re-score every job row using the latest preferences."""
     await asyncio.sleep(0.5)  # let the redirect response finish first
     db = next(get_db())

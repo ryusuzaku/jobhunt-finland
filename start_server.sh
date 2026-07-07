@@ -18,13 +18,21 @@ if command -v lsof >/dev/null 2>&1 && lsof -Pi :"$PORT" -sTCP:LISTEN -t >/dev/nu
 fi
 
 echo "Starting uvicorn on port $PORT..."
-nohup "$ROOT/.venv/bin/python" -m uvicorn src.main:app --host 127.0.0.1 --port "$PORT" --reload \
+# --reload is omitted so the background PID matches the listening port and stop scripts work reliably.
+nohup "$ROOT/.venv/bin/python" -m uvicorn src.main:app --host 127.0.0.1 --port "$PORT" \
     > "$ROOT/logs/uvicorn.log" 2> "$ROOT/logs/uvicorn.err.log" &
 
-sleep 3
+# Uvicorn binds the port after the lifespan startup fetch completes, which can take ~30-60s.
+echo "Waiting for the first fetch to finish and the port to come up..."
+TIMEOUT=120
+ELAPSED=0
+while [ $ELAPSED -lt $TIMEOUT ]; do
+    sleep 2
+    ELAPSED=$((ELAPSED + 2))
+    if command -v lsof >/dev/null 2>&1 && lsof -Pi :"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
+        echo "Server started successfully on http://127.0.0.1:$PORT/"
+        exit 0
+    fi
+done
 
-if command -v lsof >/dev/null 2>&1 && lsof -Pi :"$PORT" -sTCP:LISTEN -t >/dev/null 2>&1; then
-    echo "Server started successfully on http://127.0.0.1:$PORT/"
-else
-    echo "Server may have failed to start. Check logs/uvicorn.err.log"
-fi
+echo "Server did not bind to port $PORT within ${TIMEOUT}s. It may still be starting; check logs/uvicorn.err.log"

@@ -1,4 +1,4 @@
-# Start the JobHunt Finland FastAPI server as a background process.
+# Start the JobHunt Finland FastAPI server as a detached background process.
 # Logs are written to logs/uvicorn.log and logs/uvicorn.err.log.
 
 $Port = 8006
@@ -22,19 +22,29 @@ if ($Existing) {
 }
 
 Write-Host "Starting uvicorn on port $Port..." -ForegroundColor Green
-Start-Process `
-    -FilePath (Join-Path $Root ".venv\Scripts\python.exe") `
-    -ArgumentList "-m uvicorn src.main:app --host 127.0.0.1 --port $Port --reload" `
-    -WorkingDirectory $Root `
-    -WindowStyle Hidden `
-    -RedirectStandardOutput (Join-Path $Logs "uvicorn.log") `
-    -RedirectStandardError (Join-Path $Logs "uvicorn.err.log")
 
-Start-Sleep -Seconds 3
+# Use WMI so the server is fully detached from this PowerShell window/job.
+$Python = Join-Path $Root ".venv\Scripts\python.exe"
+$Cmd = 'cmd.exe /c cd /d ' + $Root + ' && ' + $Python + ' -m uvicorn src.main:app --host 127.0.0.1 --port ' + $Port + ' > logs\uvicorn.log 2> logs\uvicorn.err.log'
+$Proc = Invoke-WmiMethod -Class Win32_Process -Name Create -ArgumentList $Cmd, $Root
 
-$Check = netstat -ano | Select-String ":$Port\s+.*LISTENING\s+(\d+)"
-if ($Check) {
-    Write-Host "Server started successfully on http://127.0.0.1:$Port/ (PID $($Check.Matches[0].Groups[1].Value))" -ForegroundColor Green
-} else {
-    Write-Host "Server may have failed to start. Check logs/uvicorn.err.log" -ForegroundColor Red
+if ($Proc.ReturnValue -ne 0) {
+    Write-Host "Failed to start server (WMI return value $($Proc.ReturnValue))." -ForegroundColor Red
+    exit 1
 }
+
+# Uvicorn binds the port after the lifespan startup fetch completes, which can take ~30-60s.
+Write-Host "Waiting for the first fetch to finish and the port to come up..." -ForegroundColor Cyan
+$Timeout = 120
+$Elapsed = 0
+while ($Elapsed -lt $Timeout) {
+    Start-Sleep -Seconds 2
+    $Elapsed += 2
+    $Check = netstat -ano | Select-String ":$Port\s+.*LISTENING\s+(\d+)"
+    if ($Check) {
+        Write-Host "Server started successfully on http://127.0.0.1:$Port/ (PID $($Check.Matches[0].Groups[1].Value))" -ForegroundColor Green
+        exit 0
+    }
+}
+
+Write-Host "Server did not bind to port $Port within ${Timeout}s. It may still be starting; check logs/uvicorn.err.log" -ForegroundColor Yellow
