@@ -7,6 +7,7 @@ from fastapi import FastAPI, Request, Depends, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
@@ -66,10 +67,20 @@ app = FastAPI(title=settings.app_name, lifespan=lifespan)
 app.mount("/static", StaticFiles(directory="src/static"), name="static")
 
 
+def _allowed_location_clause():
+    """SQLAlchemy filter: job location must contain one of the allowed cities."""
+    return or_(
+        *[
+            Job.location.ilike(f"%{loc}%")
+            for loc in settings.allowed_dashboard_locations
+        ]
+    )
+
+
 def _dashboard_context(request: Request, db: Session):
     jobs = (
         db.query(Job)
-        .filter(Job.hidden == False)
+        .filter(Job.hidden == False, _allowed_location_clause())
         .order_by(Job.score.desc(), Job.date_posted.desc())
         .limit(100)
         .all()
@@ -96,11 +107,20 @@ def _dashboard_context(request: Request, db: Session):
 
 @app.get("/api/locations")
 def api_locations(db: Session = Depends(get_db)):
-    """Return distinct non-empty locations from visible jobs for the town filter."""
-    rows = db.query(Job.location).filter(Job.hidden == False).distinct().all()
-    return sorted(
-        {(r[0] or "").strip().lower() for r in rows if (r[0] or "").strip()}
+    """Return allowed locations that actually appear in visible jobs."""
+    rows = (
+        db.query(Job.location)
+        .filter(Job.hidden == False, _allowed_location_clause())
+        .distinct()
+        .all()
     )
+    found = set()
+    for row in rows:
+        loc = (row[0] or "").lower()
+        for allowed in settings.allowed_dashboard_locations:
+            if allowed in loc:
+                found.add(allowed)
+    return sorted(found)
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -213,7 +233,7 @@ async def trigger_fetch(db: Session = Depends(get_db)):
 def api_jobs(db: Session = Depends(get_db), min_score: float = 0.0, limit: int = 100):
     jobs = (
         db.query(Job)
-        .filter(Job.hidden == False, Job.score >= min_score)
+        .filter(Job.hidden == False, Job.score >= min_score, _allowed_location_clause())
         .order_by(Job.score.desc(), Job.date_posted.desc())
         .limit(limit)
         .all()

@@ -77,11 +77,19 @@
                     <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mt-5 mb-2">Sources</label>
                     <div id="source-filters" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
 
-                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mt-5 mb-2">Town / location</label>
+                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mt-5 mb-2">City</label>
                     <select id="town-filter" multiple class="w-full rounded-lg border-slate-300 text-sm py-2 px-3 border focus:border-blue-500 focus:ring-blue-500">
-                        <option value="" disabled>All locations</option>
+                        <option value="" disabled>All cities</option>
+                        <option value="helsinki">Helsinki</option>
+                        <option value="espoo">Espoo</option>
+                        <option value="vantaa">Vantaa</option>
+                        <option value="tampere">Tampere</option>
+                        <option value="turku">Turku</option>
+                        <option value="lahti">Lahti</option>
+                        <option value="bengaluru">Bengaluru</option>
+                        <option value="bangalore">Bangalore</option>
                     </select>
-                    <p class="text-xs text-slate-400">Loading locations...</p>
+                    <p class="text-xs text-slate-400">Hold Ctrl/Cmd to select several.</p>
 
                     <div class="mt-5 space-y-3">
                         <label class="flex items-center gap-2 cursor-pointer">
@@ -281,22 +289,7 @@
             filterJobs();
         });
 
-        // Populate the location filter dynamically from the API.
-        fetch('/api/locations')
-            .then(r => r.json())
-            .then(locations => {
-                townFilter.innerHTML = '<option value="" disabled>All locations</option>';
-                locations.forEach(loc => {
-                    const option = document.createElement('option');
-                    option.value = loc;
-                    option.textContent = loc.replace(/\\b\\w/g, c => c.toUpperCase());
-                    townFilter.appendChild(option);
-                });
-                document.querySelector('#town-filter + p').textContent = 'Hold Ctrl/Cmd to select several.';
-            })
-            .catch(() => {
-                document.querySelector('#town-filter + p').textContent = 'Could not load locations.';
-            });
+
 
         async function hideJob(id, btn) {
             await fetch(`/hide/${id}`, { method: 'POST' });

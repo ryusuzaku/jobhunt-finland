@@ -55,6 +55,13 @@ class Settings(BaseSettings):
     default_preferred_locations: list[str] = [
         "helsinki", "espoo", "vantaa", "tampere", "turku", "oulu",
     ]
+
+    # Locations that are allowed to appear in the dashboard and API.
+    # Jobs whose location does not contain one of these tokens are hidden.
+    allowed_dashboard_locations: list[str] = [
+        "helsinki", "espoo", "vantaa", "tampere", "turku", "lahti",
+        "bengaluru", "bangalore",
+    ]
     default_remote_ok: bool = True
     default_hybrid_ok: bool = True
 
