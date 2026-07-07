@@ -1,0 +1,18 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# Data / logs
+*.db
+*.log
+*.err
+server*.log
+server*.err
+data/
+logs/
+
+# Environment
+.env
