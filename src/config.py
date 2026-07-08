@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     app_name: str = "JobHunt Finland"
     debug: bool = False
 
+    # Dashboard pagination
+    dashboard_page_size: int = 50
+
     # Database
     database_url: str = f"sqlite:///{DATA_DIR / 'jobs.db'}"
 

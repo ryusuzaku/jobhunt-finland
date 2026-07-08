@@ -1,6 +1,6 @@
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, Text, Float, Boolean, DateTime, JSON
-from sqlalchemy.orm import declarative_base, sessionmaker
+from sqlalchemy import create_engine, Column, ForeignKey, Integer, String, Text, Float, Boolean, DateTime, JSON
+from sqlalchemy.orm import declarative_base, relationship, sessionmaker
 
 from src.config import settings
 
@@ -56,6 +56,29 @@ class Job(Base):
 
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    application = relationship("Application", back_populates="job", uselist=False)
+
+
+class Application(Base):
+    __tablename__ = "applications"
+
+    id = Column(Integer, primary_key=True)
+    job_id = Column(Integer, ForeignKey("jobs.id"), unique=True, nullable=False, index=True)
+
+    # Lifecycle status
+    status = Column(String(30), default="saved")  # saved, applied, interview, offer, rejected, withdrawn, ghosted
+
+    # Dates
+    applied_at = Column(DateTime, nullable=True)
+    closing_date = Column(DateTime, nullable=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Notes / outcome
+    notes = Column(Text, nullable=True)
+    outcome = Column(Text, nullable=True)
+
+    job = relationship("Job", back_populates="application")
 
 
 class Preference(Base):

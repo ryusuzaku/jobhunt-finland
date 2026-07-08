@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from src.config import settings
-from src.models import Base, engine, get_db, Job
+from src.models import Base, engine, get_db, Job, Application
 from src.scorer import score_job
 from src.scraper import fetch_all_jobs, save_jobs, prune_stale_jobs
 from src.alerts import send_console_alerts, send_email_alerts, send_discord_alerts, send_slack_alerts
@@ -20,6 +20,17 @@ from src.preferences import get_preferences, set_preferences
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
+
+# Application lifecycle statuses
+APPLICATION_STATUSES = [
+    "saved",
+    "applied",
+    "interview",
+    "offer",
+    "rejected",
+    "withdrawn",
+    "ghosted",
+]
 
 # Create tables
 Base.metadata.create_all(bind=engine)
@@ -77,12 +88,19 @@ def _allowed_location_clause():
     )
 
 
-def _dashboard_context(request: Request, db: Session):
+def _dashboard_context(request: Request, db: Session, page: int = 1):
+    page_size = settings.dashboard_page_size
+    base_query = db.query(Job).filter(
+        Job.hidden == False, _allowed_location_clause()
+    )
+    total_jobs = base_query.count()
+    total_pages = max(1, (total_jobs + page_size - 1) // page_size)
+    page = max(1, min(page, total_pages))
+
     jobs = (
-        db.query(Job)
-        .filter(Job.hidden == False, _allowed_location_clause())
-        .order_by(Job.score.desc(), Job.date_posted.desc())
-        .limit(100)
+        base_query.order_by(Job.score.desc(), Job.date_posted.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
         .all()
     )
     scores = [j.score for j in jobs]
@@ -102,6 +120,9 @@ def _dashboard_context(request: Request, db: Session):
         "settings": settings,
         "prefs": prefs,
         "sources": sources,
+        "page": page,
+        "total_pages": total_pages,
+        "total_jobs": total_jobs,
     }
 
 
@@ -124,11 +145,11 @@ def api_locations(db: Session = Depends(get_db)):
 
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard(request: Request, db: Session = Depends(get_db)):
+def dashboard(request: Request, page: int = 1, db: Session = Depends(get_db)):
     return templates.TemplateResponse(
         request,
         "index.html",
-        _dashboard_context(request, db),
+        _dashboard_context(request, db, page=page),
     )
 
 
@@ -169,6 +190,118 @@ def save_preferences(
     scheduler.add_job(_rescore_all_jobs)
 
     return RedirectResponse(url="/", status_code=303)
+
+
+def _parse_date(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, "%Y-%m-%d")
+    except ValueError:
+        return None
+
+
+@app.get("/applications", response_class=HTMLResponse)
+def applications_page(request: Request, db: Session = Depends(get_db)):
+    apps = (
+        db.query(Application)
+        .join(Job)
+        .order_by(Application.applied_at.desc(), Application.updated_at.desc())
+        .all()
+    )
+    grouped = {status: [] for status in APPLICATION_STATUSES}
+    for app in apps:
+        grouped.setdefault(app.status, []).append(app)
+    return templates.TemplateResponse(
+        request,
+        "applications.html",
+        {
+            "request": request,
+            "settings": settings,
+            "grouped": grouped,
+            "statuses": APPLICATION_STATUSES,
+        },
+    )
+
+
+@app.post("/applications")
+def create_application(
+    request: Request,
+    job_id: int = Form(),
+    status: str = Form("saved"),
+    applied_at: str = Form(""),
+    closing_date: str = Form(""),
+    notes: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    if status not in APPLICATION_STATUSES:
+        status = "saved"
+
+    job = db.query(Job).filter(Job.id == job_id).first()
+    if not job:
+        return RedirectResponse(url="/", status_code=303)
+
+    application = db.query(Application).filter(Application.job_id == job_id).first()
+    if application:
+        application.status = status
+        application.applied_at = _parse_date(applied_at) or application.applied_at
+        application.closing_date = _parse_date(closing_date) or application.closing_date
+        application.notes = notes
+    else:
+        application = Application(
+            job_id=job_id,
+            status=status,
+            applied_at=_parse_date(applied_at),
+            closing_date=_parse_date(closing_date),
+            notes=notes,
+        )
+        db.add(application)
+
+    job.hidden = status != "saved"
+    db.commit()
+    return RedirectResponse(url="/applications", status_code=303)
+
+
+@app.post("/applications/{application_id}")
+def update_application(
+    request: Request,
+    application_id: int,
+    status: str = Form("saved"),
+    applied_at: str = Form(""),
+    closing_date: str = Form(""),
+    notes: str = Form(""),
+    outcome: str = Form(""),
+    db: Session = Depends(get_db),
+):
+    if status not in APPLICATION_STATUSES:
+        status = "saved"
+
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if not application:
+        return RedirectResponse(url="/applications", status_code=303)
+
+    application.status = status
+    if applied_at:
+        application.applied_at = _parse_date(applied_at)
+    if closing_date:
+        application.closing_date = _parse_date(closing_date)
+    application.notes = notes
+    application.outcome = outcome
+
+    application.job.hidden = status != "saved"
+    db.commit()
+    return RedirectResponse(url="/applications", status_code=303)
+
+
+@app.post("/applications/{application_id}/delete")
+def delete_application(application_id: int, db: Session = Depends(get_db)):
+    application = db.query(Application).filter(Application.id == application_id).first()
+    if application:
+        job = application.job
+        db.delete(application)
+        job.hidden = False
+        db.commit()
+    return RedirectResponse(url="/applications", status_code=303)
 
 
 async def _rescore_all_jobs():
@@ -230,11 +363,17 @@ async def trigger_fetch(db: Session = Depends(get_db)):
 
 
 @app.get("/api/jobs")
-def api_jobs(db: Session = Depends(get_db), min_score: float = 0.0, limit: int = 100):
+def api_jobs(
+    db: Session = Depends(get_db),
+    min_score: float = 0.0,
+    skip: int = 0,
+    limit: int = 100,
+):
     jobs = (
         db.query(Job)
         .filter(Job.hidden == False, Job.score >= min_score, _allowed_location_clause())
         .order_by(Job.score.desc(), Job.date_posted.desc())
+        .offset(skip)
         .limit(limit)
         .all()
     )
