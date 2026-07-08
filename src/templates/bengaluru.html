@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ settings.app_name }}</title>
+    <title>Bengaluru jobs — {{ settings.app_name }}</title>
     <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -20,8 +20,8 @@
                 </div>
             </a>
             <nav class="flex items-center gap-6 text-sm font-medium">
-                <a href="/" class="text-white hover:text-blue-300 transition">Dashboard</a>
-                <a href="/bengaluru" class="text-slate-300 hover:text-white transition">Bengaluru</a>
+                <a href="/" class="text-slate-300 hover:text-white transition">Dashboard</a>
+                <a href="/bengaluru" class="text-white hover:text-blue-300 transition">Bengaluru</a>
                 <a href="/applications" class="text-slate-300 hover:text-white transition">Applications</a>
                 <a href="/preferences" class="text-slate-300 hover:text-white transition">Preferences</a>
                 <a href="/docs" class="text-slate-300 hover:text-white transition">API Docs</a>
@@ -33,8 +33,8 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
             <div class="md:flex md:items-center md:justify-between gap-6">
                 <div>
-                    <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">Find your next junior tech role</h2>
-                    <p class="text-blue-100 max-w-2xl text-lg">Ranked by learning &amp; growth, work-life fit, tech stack match, and company quality.</p>
+                    <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">Bengaluru jobs</h2>
+                    <p class="text-blue-100 max-w-2xl text-lg">Junior tech roles in Bengaluru and Bangalore, ranked the same way.</p>
                 </div>
             </div>
             <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8">
@@ -78,20 +78,6 @@
 
                     <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mt-5 mb-2">Sources</label>
                     <div id="source-filters" class="space-y-2 max-h-48 overflow-y-auto pr-1"></div>
-
-                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mt-5 mb-2">City</label>
-                    <select id="town-filter" multiple class="w-full rounded-lg border-slate-300 text-sm py-2 px-3 border focus:border-blue-500 focus:ring-blue-500">
-                        <option value="" disabled>All cities</option>
-                        <option value="helsinki">Helsinki</option>
-                        <option value="espoo">Espoo</option>
-                        <option value="vantaa">Vantaa</option>
-                        <option value="tampere">Tampere</option>
-                        <option value="turku">Turku</option>
-                        <option value="lahti">Lahti</option>
-                        <option value="bengaluru">Bengaluru</option>
-                        <option value="bangalore">Bangalore</option>
-                    </select>
-                    <p class="text-xs text-slate-400">Hold Ctrl/Cmd to select several.</p>
 
                     <div class="mt-5 space-y-3">
                         <label class="flex items-center gap-2 cursor-pointer">
@@ -243,13 +229,13 @@
                 {% if total_pages > 1 %}
                 <div class="mt-6 flex items-center justify-between bg-white rounded-xl border border-slate-200 px-4 py-3 shadow-sm">
                     {% if page > 1 %}
-                    <a href="/?page={{ page - 1 }}" class="text-sm font-semibold text-blue-600 hover:text-blue-800 px-3 py-2 rounded-lg hover:bg-blue-50 transition">← Previous</a>
+                    <a href="/bengaluru?page={{ page - 1 }}" class="text-sm font-semibold text-blue-600 hover:text-blue-800 px-3 py-2 rounded-lg hover:bg-blue-50 transition">← Previous</a>
                     {% else %}
                     <span class="text-sm font-semibold text-slate-400 px-3 py-2">← Previous</span>
                     {% endif %}
                     <span class="text-sm text-slate-600">Page {{ page }} of {{ total_pages }} ({{ total_jobs }} jobs)</span>
                     {% if page < total_pages %}
-                    <a href="/?page={{ page + 1 }}" class="text-sm font-semibold text-blue-600 hover:text-blue-800 px-3 py-2 rounded-lg hover:bg-blue-50 transition">Next →</a>
+                    <a href="/bengaluru?page={{ page + 1 }}" class="text-sm font-semibold text-blue-600 hover:text-blue-800 px-3 py-2 rounded-lg hover:bg-blue-50 transition">Next →</a>
                     {% else %}
                     <span class="text-sm font-semibold text-slate-400 px-3 py-2">Next →</span>
                     {% endif %}
@@ -265,11 +251,9 @@
         const hybridOnly = document.getElementById('hybrid-only');
         const scoreButtons = document.querySelectorAll('#score-filters .chip');
         const sourceFilters = document.getElementById('source-filters');
-        const townFilter = document.getElementById('town-filter');
 
         let minScore = 50;
         let selectedSources = new Set();
-        let selectedTowns = new Set();
 
         // Build source checkboxes from the server-provided source list.
         const sources = {{ sources | tojson }};
@@ -288,8 +272,6 @@
             const term = searchInput.value.toLowerCase();
             const requireRemote = remoteOnly.checked;
             const requireHybrid = hybridOnly.checked;
-            const requireTown = selectedTowns.size > 0;
-
             let shown = 0, newCount = 0, totalScore = 0;
 
             document.querySelectorAll('.job-card').forEach(el => {
@@ -298,8 +280,7 @@
                 const matchesSource = selectedSources.has(el.dataset.source);
                 const matchesRemote = !requireRemote || el.dataset.remote === '1';
                 const matchesHybrid = !requireHybrid || el.dataset.hybrid === '1';
-                const matchesTown = !requireTown || [...selectedTowns].some(town => el.dataset.location.includes(town));
-                const show = matchesText && matchesScore && matchesSource && matchesRemote && matchesHybrid && matchesTown;
+                const show = matchesText && matchesScore && matchesSource && matchesRemote && matchesHybrid;
 
                 el.style.display = show ? '' : 'none';
                 if (show) {
@@ -338,13 +319,6 @@
                 filterJobs();
             }
         });
-
-        townFilter.addEventListener('change', () => {
-            selectedTowns = new Set([...townFilter.selectedOptions].map(o => o.value).filter(v => v));
-            filterJobs();
-        });
-
-
 
         async function hideJob(id, btn) {
             await fetch(`/hide/${id}`, { method: 'POST' });

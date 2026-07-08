@@ -13,7 +13,8 @@ The project is a working, self-hosted FastAPI dashboard that aggregates and rank
 - ✅ Automatic fallback to snapshots when a source fails or returns empty.
 - ✅ Transparent heuristic scoring with user-editable preferences.
 - ✅ Dashboard with search, minimum-score filter, source checkboxes, remote/hybrid toggles, and a city filter.
-- ✅ Server-side pagination on the dashboard (no more hard 100-job limit).
+- ✅ Dedicated `/bengaluru` page for Bengaluru/Bangalore jobs only.
+- ✅ Server-side pagination on the dashboard and Bengaluru page (no more hard 100-job limit).
 - ✅ Application tracker: tag jobs you’re applying for, hide them from the dashboard, and track status / dates / notes / outcomes on a dedicated page.
 - ✅ Alerts via console, email, Discord, and Slack.
 - ✅ Hide-jobs feature.

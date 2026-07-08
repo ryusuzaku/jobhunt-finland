@@ -153,6 +153,49 @@ def dashboard(request: Request, page: int = 1, db: Session = Depends(get_db)):
     )
 
 
+def _bengaluru_context(request: Request, db: Session, page: int = 1):
+    page_size = settings.dashboard_page_size
+    base_query = db.query(Job).filter(
+        Job.hidden == False,
+        or_(Job.location.ilike("%bengaluru%"), Job.location.ilike("%bangalore%")),
+    )
+    total_jobs = base_query.count()
+    total_pages = max(1, (total_jobs + page_size - 1) // page_size)
+    page = max(1, min(page, total_pages))
+
+    jobs = (
+        base_query.order_by(Job.score.desc(), Job.date_posted.desc())
+        .offset((page - 1) * page_size)
+        .limit(page_size)
+        .all()
+    )
+    scores = [j.score for j in jobs]
+    avg_score = round(sum(scores) / len(scores), 0) if scores else 0
+    prefs = get_preferences(db)
+    sources = sorted({row[0] for row in db.query(Job.source).distinct() if row[0]})
+
+    return {
+        "request": request,
+        "jobs": jobs,
+        "avg_score": avg_score,
+        "settings": settings,
+        "prefs": prefs,
+        "sources": sources,
+        "page": page,
+        "total_pages": total_pages,
+        "total_jobs": total_jobs,
+    }
+
+
+@app.get("/bengaluru", response_class=HTMLResponse)
+def bengaluru(request: Request, page: int = 1, db: Session = Depends(get_db)):
+    return templates.TemplateResponse(
+        request,
+        "bengaluru.html",
+        _bengaluru_context(request, db, page=page),
+    )
+
+
 @app.get("/preferences", response_class=HTMLResponse)
 def preferences_page(request: Request, db: Session = Depends(get_db)):
     prefs = get_preferences(db)
