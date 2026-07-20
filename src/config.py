@@ -50,6 +50,22 @@ class Settings(BaseSettings):
         "test automation engineer",
     ]
 
+    # Indian job-board search terms (Bengaluru)
+    indian_search_terms: list[str] = [
+        "python developer",
+        "software developer",
+        "frontend developer",
+        "backend developer",
+        "full stack developer",
+        "data analyst",
+        "data engineer",
+        "machine learning engineer",
+        "devops engineer",
+    ]
+
+    # Finnish IT company career-page list (JSON: name, career_url, ats, slug)
+    company_careers_file: str = str(DATA_DIR / "finnish_companies.json")
+
     # Default preferences (can be overridden via dashboard)
     default_preferred_tech: list[str] = [
         "python", "javascript", "typescript", "react", "node.js",
@@ -57,6 +73,7 @@ class Settings(BaseSettings):
     ]
     default_preferred_locations: list[str] = [
         "helsinki", "espoo", "vantaa", "tampere", "turku", "oulu",
+        "bengaluru", "bangalore",
     ]
 
     # Locations that are allowed to appear in the dashboard and API.

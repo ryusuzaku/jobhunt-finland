@@ -8,6 +8,10 @@ from .remoteok import RemoteOKSource
 from .remotive import RemotiveSource
 from .workingnomads import WorkingNomadsSource
 from .weworkremotely import WeWorkRemotelySource
+from .hasjob import HasjobSource
+from .shine import ShineSource
+from .internshala import InternshalaSource
+from .companycareers import CompanyCareersSource
 
 __all__ = [
     "DuunitoriSource",
@@ -20,4 +24,8 @@ __all__ = [
     "RemotiveSource",
     "WorkingNomadsSource",
     "WeWorkRemotelySource",
+    "HasjobSource",
+    "ShineSource",
+    "InternshalaSource",
+    "CompanyCareersSource",
 ]

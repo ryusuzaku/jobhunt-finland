@@ -1,14 +1,16 @@
 # Project Status — JobHunt Finland
 
-Last updated: 2026-07-07
+Last updated: 2026-07-20
 
 ## Current state
 
 The project is a working, self-hosted FastAPI dashboard that aggregates and ranks junior tech jobs for the Finnish market (plus selected global remote roles).
 
 - ✅ Server runs reliably as a detached background process on `http://127.0.0.1:8006/`.
-- ✅ 10 active data sources (Duunitori, The Hub, EnglishJobs.fi, Jobly, Academic Work, LinkedIn, RemoteOK, Remotive, Working Nomads, We Work Remotely).
-- ✅ ~1,600 visible jobs after de-duplication and filtering.
+- ✅ 14 active data sources (Duunitori, The Hub, EnglishJobs.fi, Jobly, Academic Work, LinkedIn, RemoteOK, Remotive, Working Nomads, We Work Remotely, Hasjob, Shine, Internshala, Finnish company career pages).
+- ✅ ~800+ visible jobs after de-duplication, filtering, and stale-job pruning.
+- ✅ Indian sources (Bengaluru/Bangalore only): Shine, Internshala, Hasjob — with INR/LPA salary parsing.
+- ✅ Finnish IT company career-page scraper: jobs fetched directly from employer ATS endpoints (Greenhouse, Teamtailor, SmartRecruiters) via a curated company list (`data/finnish_companies.json`).
 - ✅ Two-layer caching: HTTP response cache (`data/response_cache.db`) and per-source job snapshot cache (`data/fetch_snapshot.json`).
 - ✅ Automatic fallback to snapshots when a source fails or returns empty.
 - ✅ Transparent heuristic scoring with user-editable preferences.
@@ -23,6 +25,9 @@ The project is a working, self-hosted FastAPI dashboard that aggregates and rank
 
 ## Recently completed
 
+- Added Indian job sources for Bengaluru: Shine (HTML), Internshala (HTML), Hasjob (Atom feed).
+- Added a Finnish IT company career-page scraper with ATS adapters (Greenhouse, Teamtailor, SmartRecruiters, Lever, Recruitee, Workable, Ashby, BambooHR) and a curated starter list of ~15 companies.
+- Extended salary extraction to Indian formats (`4.0 - 8 LPA`, `₹3,00,000 - 5,00,000 /year`, `₹ 15,000 /month`) and added relative-date parsing (`posted 3 days ago`).
 - Added RemoteOK, Remotive, Working Nomads, and We Work Remotely sources.
 - Added HTTP + snapshot caching to avoid hammering sources and to survive transient failures.
 - Added a city filter and restricted the dashboard/API to allowed cities.
@@ -38,6 +43,10 @@ The project is a working, self-hosted FastAPI dashboard that aggregates and rank
 - **Oikotie Työpaikat** is not integrated because listings are loaded client-side (requires a headless browser).
 - **TE-palvelut / Työmarkkinatori** is not integrated because the API requires authentication.
 - **LinkedIn** is scraped conservatively; 429 responses trigger a 2-hour cooldown and fallback to snapshots.
+- **TimesJobs** was attempted but skipped: the search page is now a JS-only Next.js shell with no server-rendered listings.
+- **Naukri, Foundit/Monster India, Hirist, CutShort, Indeed India** are not integrated (JS rendering or unofficial/paid APIs only). Can be revisited if Apify/Parse credentials are provided.
+- **Hasjob** can legitimately return 0 jobs when its feed has no Bengaluru tech postings; the snapshot fallback covers gaps.
+- The company career list is a starter set; add more employers to `data/finnish_companies.json` (see the ATS adapter names in `src/sources/companycareers.py`).
 - PowerShell prints occasional non-fatal `cp932` codec warnings when displaying Finnish/Unicode characters; this is a console-encoding issue and does not affect the app.
 
 ## How to verify everything is working

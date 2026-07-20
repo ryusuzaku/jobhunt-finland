@@ -1,0 +1,18 @@
+{
+  "companies": [
+    {"name": "Wolt", "career_url": "https://careers.wolt.com/", "ats": "greenhouse", "slug": "wolt"},
+    {"name": "RELEX Solutions", "career_url": "https://www.relexsolutions.com/careers/", "ats": "greenhouse", "slug": "relex"},
+    {"name": "Oura", "career_url": "https://ouraring.com/careers", "ats": "greenhouse", "slug": "oura"},
+    {"name": "Smartly.io", "career_url": "https://www.smartly.io/careers", "ats": "greenhouse", "slug": "smartlyio"},
+    {"name": "Solita", "career_url": "https://www.solita.fi/en/careers/", "ats": "greenhouse", "slug": "solita"},
+    {"name": "Remedy Entertainment", "career_url": "https://www.remedygames.com/careers/", "ats": "greenhouse", "slug": "remedy"},
+    {"name": "Housemarque", "career_url": "https://housemarque.com/careers/", "ats": "greenhouse", "slug": "housemarque"},
+    {"name": "Yousician", "career_url": "https://yousician.com/careers", "ats": "greenhouse", "slug": "yousician"},
+    {"name": "Metacore", "career_url": "https://metacoregames.com/careers/", "ats": "greenhouse", "slug": "metacore"},
+    {"name": "Vincit", "career_url": "https://www.vincit.com/careers/", "ats": "teamtailor", "slug": "vincitoyj"},
+    {"name": "Siili Solutions", "career_url": "https://www.siili.com/careers", "ats": "teamtailor", "slug": "siili"},
+    {"name": "Eficode", "career_url": "https://www.eficode.com/careers", "ats": "teamtailor", "slug": "eficode"},
+    {"name": "Wunderdog", "career_url": "https://www.wunderdog.fi/careers", "ats": "teamtailor", "slug": "wunderdog"},
+    {"name": "Tietoevry", "career_url": "https://www.tietoevry.com/en/careers/", "ats": "smartrecruiters", "slug": "Tieto2"}
+  ]
+}

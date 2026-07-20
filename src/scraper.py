@@ -19,6 +19,10 @@ from src.sources import (
     RemotiveSource,
     WorkingNomadsSource,
     WeWorkRemotelySource,
+    HasjobSource,
+    ShineSource,
+    InternshalaSource,
+    CompanyCareersSource,
 )
 
 logger = logging.getLogger(__name__)
@@ -34,6 +38,10 @@ SOURCES = [
     RemotiveSource(),
     WorkingNomadsSource(),
     WeWorkRemotelySource(),
+    HasjobSource(),
+    ShineSource(),
+    InternshalaSource(),
+    CompanyCareersSource(),
 ]
 
 snapshot_cache = JobSnapshotCache()

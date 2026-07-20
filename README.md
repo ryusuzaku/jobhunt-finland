@@ -4,7 +4,7 @@ A self-hosted job-hunting agent that aggregates junior-level tech positions in F
 
 ## What it does
 
-- Fetches jobs automatically every hour from 10 sources.
+- Fetches jobs automatically every hour from 14 sources, including Indian boards (Bengaluru) and Finnish IT companies' own career pages.
 - Scores each job on a 0–100 scale using four transparent signals:
   1. **Learning & growth potential** (junior/trainee/mentor language, career progression)
   2. **Work-life / location fit** (remote/hybrid, flexible hours, preferred cities)
@@ -27,10 +27,26 @@ A self-hosted job-hunting agent that aggregates junior-level tech positions in F
 | **Remotive** | JSON API | Remote software/data/devops roles; location-filtered |
 | **Working Nomads** | JSON API | Remote tech jobs; tech-role filter |
 | **We Work Remotely** | RSS parse | Remote tech jobs |
+| **Shine** | HTML scrape | Indian jobs, Bengaluru/Bangalore only, INR salary parsing |
+| **Internshala** | HTML scrape | Indian fresher/intern jobs, Bengaluru only |
+| **Hasjob** | Atom feed | Indian tech/startup jobs, Bengaluru only |
+| **Company career pages** | ATS JSON APIs | Finnish IT employers via Greenhouse / Teamtailor / SmartRecruiters (see `data/finnish_companies.json`) |
 
-Sources that require JavaScript rendering (Oikotie Työpaikat) or authenticated APIs (TE-palvelut / Työmarkkinatori) are intentionally not integrated yet.
+Sources that require JavaScript rendering (Oikotie Työpaikat, TimesJobs, Naukri, Hirist) or authenticated/unofficial APIs (TE-palvelut / Työmarkkinatori, Foundit, CutShort) are intentionally not integrated yet.
+
+### Adding more Finnish companies
+
+Edit `data/finnish_companies.json` and add entries like:
+
+```json
+{"name": "Example Corp", "career_url": "https://example.com/careers", "ats": "greenhouse", "slug": "examplecorp"}
+```
+
+Supported `ats` values: `greenhouse`, `teamtailor`, `smartrecruiters`, `lever`, `recruitee`, `workable`, `ashby`, `bamboohr`. The `slug` is the company's board identifier (e.g. `boards-api.greenhouse.io/v1/boards/<slug>/jobs` or `<slug>.teamtailor.com/jobs.json`). Only tech roles in the allowed Finnish cities are kept.
 
 ## Quick start
+
+**Requirements:** Python 3.11+ on PATH. Everything else (virtualenv, dependencies, `.env`, directories) is handled by the setup script.
 
 ### Windows
 
@@ -46,7 +62,7 @@ Sources that require JavaScript rendering (Oikotie Työpaikat) or authenticated 
 
 ```bash
 # 1. One-time setup
-chmod +x setup.sh start_server.sh stop_server.sh
+chmod +x setup.sh start_server.sh stop_server.sh server_status.sh
 ./setup.sh
 
 # 2. Start the server
@@ -54,6 +70,8 @@ chmod +x setup.sh start_server.sh stop_server.sh
 ```
 
 Then open http://127.0.0.1:8006/ in your browser.
+
+> The first start takes 1–2 minutes: the app fetches jobs from all sources before it binds the port. Watch progress in `logs/uvicorn.err.log`. Check later runs with `.\server_status.ps1` or `./server_status.sh`.
 
 The default port is `8006`; you can change it in the start scripts if port 8000 is free on your machine.
 
@@ -126,12 +144,13 @@ jobhunt/
 │   ├── sources/             # One module per data source
 │   └── templates/           # Jinja2 dashboard pages
 ├── data/                    # SQLite DB + response cache (created on first run)
+│   └── finnish_companies.json  # Curated Finnish IT employer list for the career-page scraper
 ├── logs/                    # Uvicorn logs (created on first run)
 ├── requirements.txt
 ├── setup.ps1 / setup.sh     # One-time install scripts
 ├── start_server.ps1 / .sh   # Start the background server
 ├── stop_server.ps1 / .sh    # Stop the background server
-├── server_status.ps1        # Check if the server is running
+├── server_status.ps1 / .sh  # Check if the server is running
 ├── README.md
 ├── STATUS.md                # Current project status
 ├── .env.example
@@ -164,6 +183,8 @@ Set the relevant environment variables in `.env`; leave channels blank to disabl
 
 - [ ] Integrate Oikotie Työpaikat via a headless browser or public feed
 - [ ] Integrate TE-palvelut / Työmarkkinatori when API access is available
+- [ ] Integrate TimesJobs / Naukri / Hirist / Foundit / CutShort if stable public endpoints or API credentials become available
+- [ ] Grow `data/finnish_companies.json` with more Finnish IT employers
 - [ ] Company research signals (Glassdoor-like ratings, funding)
 - [ ] Machine-learning-based quality scoring
 - [ ] RSS / JSON feed output for external dashboards

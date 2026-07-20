@@ -11,7 +11,8 @@ venv/
 *.err
 server*.log
 server*.err
-data/
+data/*
+!data/finnish_companies.json
 logs/
 
 # Environment

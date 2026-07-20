@@ -56,7 +56,14 @@ def extract_salary(text: str) -> dict | None:
     if not text:
         return None
 
-    text = text.replace("\xa0", " ").replace(",", "").replace(" ", " ")
+    text = text.replace("\xa0", " ").replace(" ", " ")
+
+    # --- Indian formats (checked first so they win on Indian job boards) ---
+    inr = _extract_inr_salary(text)
+    if inr:
+        return inr
+
+    text = text.replace(",", "")
 
     # Patterns:
     # 3000-4000 €/kk
@@ -97,6 +104,83 @@ def extract_salary(text: str) -> dict | None:
                 "text": m.group(0),
             }
     return None
+
+
+def _extract_inr_salary(text: str) -> dict | None:
+    """Extract Indian salary formats: '4.0 - 8 LPA', '₹3,00,000 - 5,00,000 /year',
+    '₹ 15,000 /month', '₹ 5,000 lump sum'."""
+
+    # LPA range: 4.0 - 8 LPA  /  4-8 LPA  /  1.8 LPA - 11.7 LPA
+    m = re.search(
+        r"(\d+(?:\.\d+)?)\s*(?:LPA|lakhs?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*LPA",
+        text,
+        re.IGNORECASE,
+    ) or re.search(
+        r"(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*LPA",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        min_val = float(m.group(1)) * 100000
+        max_val = float(m.group(2)) * 100000
+        return {
+            "min": min_val,
+            "max": max_val,
+            "currency": "INR",
+            "period": "year",
+            "text": m.group(0),
+        }
+
+    # Rupee range: ₹3,00,000 - 5,00,000 /year  (or ₹ 3-5 LPA handled above)
+    m = re.search(
+        r"₹\s*([\d,]+(?:\.\d+)?)\s*[-–]\s*₹?\s*([\d,]+(?:\.\d+)?)\s*/?\s*(year|yr|annum|annual|month|mo|lump\s*sum|lumpsum)?",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        min_val = float(m.group(1).replace(",", ""))
+        max_val = float(m.group(2).replace(",", ""))
+        period = _normalize_inr_period(m.group(3))
+        # Heuristic: small numbers without a period are likely LPA.
+        if not m.group(3) and max_val <= 100:
+            min_val *= 100000
+            max_val *= 100000
+            period = "year"
+        return {
+            "min": min_val,
+            "max": max_val,
+            "currency": "INR",
+            "period": period,
+            "text": m.group(0),
+        }
+
+    # Single rupee amount: ₹ 15,000 /month
+    m = re.search(
+        r"₹\s*([\d,]+(?:\.\d+)?)\s*/?\s*(year|yr|annum|annual|month|mo|lump\s*sum|lumpsum)",
+        text,
+        re.IGNORECASE,
+    )
+    if m:
+        val = float(m.group(1).replace(",", ""))
+        return {
+            "min": val,
+            "max": val,
+            "currency": "INR",
+            "period": _normalize_inr_period(m.group(2)),
+            "text": m.group(0),
+        }
+    return None
+
+
+def _normalize_inr_period(period: str | None) -> str:
+    if not period:
+        return "year"
+    p = period.lower().strip()
+    if p in ("month", "mo"):
+        return "month"
+    if p in ("lump sum", "lumpsum"):
+        return "lump"
+    return "year"
 
 
 def _normalize_period(period: str) -> str:
