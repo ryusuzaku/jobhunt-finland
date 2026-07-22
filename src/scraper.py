@@ -1,4 +1,6 @@
 import logging
+import re
+import unicodedata
 from datetime import datetime, timedelta
 
 import httpx
@@ -203,6 +205,103 @@ def save_jobs(db: Session, normalized_jobs: list[dict], prefs: dict | None = Non
 
     db.commit()
     return new_count, updated_count
+
+
+# Sources whose URLs point directly at the employer are preferred when merging
+# duplicate postings of the same role.
+_SOURCE_PRIORITY = {
+    "companycareers": 0,
+    "duunitori": 1,
+    "thehub": 2,
+    "jobly": 3,
+    "englishjobs": 4,
+    "academicwork": 5,
+    "linkedin": 6,
+}
+
+_COMPANY_SUFFIXES = re.compile(
+    r"\b(oy|oyj|ab|ltd|limited|inc|llc|pvt|gmbh|plc|corp|corporation|co)\b"
+)
+
+
+def _norm_text(text: str) -> str:
+    """Lowercase, strip accents/punctuation, collapse whitespace."""
+    text = unicodedata.normalize("NFKD", text or "")
+    text = "".join(c for c in text if not unicodedata.combining(c))
+    text = re.sub(r"[^a-z0-9 ]", " ", text.lower())
+    return re.sub(r"\s+", " ", text).strip()
+
+
+def _norm_company(company: str) -> str:
+    return _COMPANY_SUFFIXES.sub("", _norm_text(company)).strip()
+
+
+def dedupe_jobs(db: Session) -> int:
+    """Delete cross-source duplicates of the same role at the same company.
+
+    Jobs are grouped by normalized (title, company). Several rows from the
+    SAME source are treated as distinct openings (e.g. one title posted for
+    multiple offices) and are kept. When the same role appears in MULTIPLE
+    sources, only the best row survives: tracked application > direct-
+    employer source > newest posting > highest score.
+    """
+    jobs = db.query(Job).filter(Job.hidden == False).all()
+    groups: dict[tuple[str, str], list[Job]] = {}
+    for job in jobs:
+        title_key = _norm_text(job.title or "")
+        company_key = _norm_company(job.company or "")
+        if not title_key or not company_key:
+            continue
+        groups.setdefault((title_key, company_key), []).append(job)
+
+    _EPOCH = datetime(1970, 1, 1)
+
+    def _posted_ts(j: Job) -> float:
+        # datetime.timestamp() raises OSError 22 on Windows for pre-1970
+        # dates (some sources yield broken dates); subtract instead.
+        if not j.date_posted:
+            return 0.0
+        try:
+            return max(0.0, (j.date_posted - _EPOCH).total_seconds())
+        except (OverflowError, OSError, TypeError):
+            return 0.0
+
+    def _rank(j: Job):
+        has_app = 0 if j.application else 1
+        priority = _SOURCE_PRIORITY.get(j.source, 9)
+        return (has_app, priority, -_posted_ts(j), -(j.score or 0))
+
+    removed = 0
+    for group in groups.values():
+        if len(group) < 2:
+            continue
+
+        # Keep the best row per source; within-source duplicates are
+        # considered distinct openings and are left alone.
+        best_per_source: dict[str, Job] = {}
+        for job in group:
+            current = best_per_source.get(job.source)
+            if current is None or _rank(job) < _rank(current):
+                best_per_source[job.source] = job
+        candidates = list(best_per_source.values())
+        if len(candidates) < 2:
+            continue
+
+        candidates.sort(key=_rank)
+        keeper = candidates[0]
+        keeper.is_new = any(j.is_new for j in group)
+        for dup in candidates[1:]:
+            logger.info(
+                "Dedup: removing '%s' at %s (%s), keeping %s",
+                dup.title, dup.company, dup.source, keeper.source,
+            )
+            db.delete(dup)
+            removed += 1
+
+    if removed:
+        db.commit()
+    logger.info("Dedup removed %d duplicate jobs", removed)
+    return removed
 
 
 def prune_stale_jobs(

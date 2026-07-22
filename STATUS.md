@@ -1,6 +1,6 @@
 # Project Status — JobHunt Finland
 
-Last updated: 2026-07-20
+Last updated: 2026-07-22
 
 ## Current state
 
@@ -22,9 +22,16 @@ The project is a working, self-hosted FastAPI dashboard that aggregates and rank
 - ✅ Hide-jobs feature.
 - ✅ One-time setup scripts for Windows (`setup.ps1`) and macOS/Linux (`setup.sh`).
 - ✅ Start/stop/status helper scripts for Windows and Unix-like systems.
+- ✅ Cross-source de-duplication: the same role at the same company posted on multiple boards is merged, keeping the best link (career page > board; tracked applications always survive).
+- ✅ Indian staffing-agency spam filter: consultancy reposts ("Hiring For ...", "Manpower", "Placements", "Walk-in") are dropped from Shine/Internshala.
+- ✅ Auto-restart watchdog: `watchdog.ps1`/`.sh` re-runs the start script when port 8006 is down; installable as a Windows Scheduled Task (`install_watchdog.ps1`) or cron entry (every 5 min + `@reboot`).
 
 ## Recently completed
 
+- Added cross-source job de-duplication (normalized title + company fuzzy match; best-link keeper, tracked applications protected).
+- Added an Indian consultancy/staffing-agency spam filter for Shine and Internshala.
+- Added an auto-restart watchdog (Windows Scheduled Task / cron) after a machine-sleep incident silently stopped the server.
+- Fixed a fetch-loop crash: `datetime.timestamp()` raises `OSError 22` on Windows for pre-1970 dates from broken source data; dedup ranking now uses safe subtraction. Console/stderr streams are also reconfigured to UTF-8 with `errors=replace` so Unicode in scraped titles can never abort a fetch.
 - Added Indian job sources for Bengaluru: Shine (HTML), Internshala (HTML), Hasjob (Atom feed).
 - Added a Finnish IT company career-page scraper with ATS adapters (Greenhouse, Teamtailor, SmartRecruiters, Lever, Recruitee, Workable, Ashby, BambooHR) and a curated starter list of ~15 companies.
 - Extended salary extraction to Indian formats (`4.0 - 8 LPA`, `₹3,00,000 - 5,00,000 /year`, `₹ 15,000 /month`) and added relative-date parsing (`posted 3 days ago`).

@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from src.config import settings
 from src.scorer import extract_salary
 from src.sources.india_common import (
+    is_agency_spam,
     is_bengaluru_location,
     is_junior_friendly,
     is_tech_role,
@@ -120,6 +121,8 @@ class InternshalaSource:
         posted_text = posted_el.get_text(strip=True) if posted_el else ""
 
         if not is_bengaluru_location(location):
+            return None
+        if is_agency_spam(company, title):
             return None
         if not is_tech_role(title, " ".join(skills) or description):
             return None

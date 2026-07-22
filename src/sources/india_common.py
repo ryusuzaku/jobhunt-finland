@@ -40,6 +40,26 @@ JUNIOR_SIGNALS = [
 
 BENGALURU_TOKENS = ["bengaluru", "bangalore"]
 
+# Staffing-agency / consultancy repost signals. Indian boards are full of
+# agencies reposting their clients' roles ("XYZ Manpower Hiring For ..."),
+# which adds noise and dead-end apply links.
+AGENCY_SPAM_KEYWORDS = [
+    "hiring for",
+    "manpower",
+    "placement",
+    "staffing",
+    "walkin",
+    "walk-in",
+    "walk in",
+    "recruitment",
+    "recruiting services",
+]
+
+
+def is_agency_spam(company: str, title: str = "") -> bool:
+    low = f"{company} {title}".lower()
+    return any(kw in low for kw in AGENCY_SPAM_KEYWORDS)
+
 _RELATIVE_DATE_RE = re.compile(
     r"(\d+|few|a|an)\s+(second|minute|hour|day|week|month|year)s?\s+ago",
     re.IGNORECASE,

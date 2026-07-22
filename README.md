@@ -5,6 +5,8 @@ A self-hosted job-hunting agent that aggregates junior-level tech positions in F
 ## What it does
 
 - Fetches jobs automatically every hour from 14 sources, including Indian boards (Bengaluru) and Finnish IT companies' own career pages.
+- De-duplicates the same role posted on multiple boards, keeping the best link (company career page preferred over aggregators).
+- Filters out Indian staffing-agency reposts ("Hiring For ...", "Manpower", "Placements", "Walk-in") so only direct-employer listings remain.
 - Scores each job on a 0–100 scale using four transparent signals:
   1. **Learning & growth potential** (junior/trainee/mentor language, career progression)
   2. **Work-life / location fit** (remote/hybrid, flexible hours, preferred cities)
@@ -70,6 +72,23 @@ chmod +x setup.sh start_server.sh stop_server.sh server_status.sh
 ```
 
 Then open http://127.0.0.1:8006/ in your browser.
+
+### Optional: auto-restart watchdog
+
+To keep the server running across crashes and reboots, install the watchdog — it checks every 5 minutes whether port 8006 is listening and restarts the server if not:
+
+```powershell
+# Windows (Scheduled Task as the current user)
+.\install_watchdog.ps1    # remove later with .\uninstall_watchdog.ps1
+```
+
+```bash
+# macOS / Linux: add to your crontab (`crontab -e`)
+*/5 * * * * /path/to/jobhunt/watchdog.sh
+@reboot /path/to/jobhunt/watchdog.sh
+```
+
+Watchdog activity is logged to `logs/watchdog.log`.
 
 > The first start takes 1–2 minutes: the app fetches jobs from all sources before it binds the port. Watch progress in `logs/uvicorn.err.log`. Check later runs with `.\server_status.ps1` or `./server_status.sh`.
 
@@ -151,6 +170,8 @@ jobhunt/
 ├── start_server.ps1 / .sh   # Start the background server
 ├── stop_server.ps1 / .sh    # Stop the background server
 ├── server_status.ps1 / .sh  # Check if the server is running
+├── watchdog.ps1 / .sh       # Restart the server if the port is down
+├── install_watchdog.ps1 / uninstall_watchdog.ps1  # Windows Scheduled Task setup
 ├── README.md
 ├── STATUS.md                # Current project status
 ├── .env.example

@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import sys
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -14,9 +15,18 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from src.config import settings
 from src.models import Base, engine, get_db, Job, Application
 from src.scorer import score_job
-from src.scraper import fetch_all_jobs, save_jobs, prune_stale_jobs
+from src.scraper import fetch_all_jobs, save_jobs, prune_stale_jobs, dedupe_jobs
 from src.alerts import send_console_alerts, send_email_alerts, send_discord_alerts, send_slack_alerts
 from src.preferences import get_preferences, set_preferences
+
+# Scraped job titles may contain characters the Windows console encoding
+# (e.g. cp932) cannot represent; reconfigure std streams so logging/prints
+# never crash the fetch loop with UnicodeEncodeError / OSError 22.
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except (AttributeError, ValueError, OSError):
+        pass
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 logger = logging.getLogger(__name__)
@@ -47,6 +57,9 @@ async def fetch_and_process():
         raw, fetched_sources = await fetch_all_jobs()
         new, updated = save_jobs(db, raw, prefs)
         logger.info("Saved %d new jobs, updated %d existing jobs", new, updated)
+        removed_dupes = dedupe_jobs(db)
+        if removed_dupes:
+            logger.info("Removed %d duplicate jobs", removed_dupes)
         prune_stale_jobs(db, fetched_sources)
         alerted = send_console_alerts(db)
         if settings.smtp_host:

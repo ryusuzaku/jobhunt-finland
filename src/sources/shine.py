@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from src.config import settings
 from src.scorer import extract_salary
 from src.sources.india_common import (
+    is_agency_spam,
     is_bengaluru_location,
     is_junior_friendly,
     is_tech_role,
@@ -109,6 +110,8 @@ class ShineSource:
         skills = [li.get_text(strip=True) for li in card.select("ul.jobCardNova_skillsLists__7YifX li")]
 
         if not is_bengaluru_location(location):
+            return None
+        if is_agency_spam(company, title):
             return None
         if not is_tech_role(title, " ".join(skills)):
             return None
