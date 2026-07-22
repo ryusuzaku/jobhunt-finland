@@ -1,0 +1,219 @@
+{% extends "base.html" %}
+
+{% block title %}Welcome — JobHunt{% endblock %}
+
+{% block content %}
+<div class="mx-auto mt-6 max-w-2xl"
+     x-data="{
+       step: 1,
+       tracks: {{ (prefs.role_tracks or []) | tojson }},
+       level: {{ (prefs.experience_level or 'junior') | tojson }},
+       techs: {{ (prefs.preferred_tech or []) | tojson }},
+       techSearch: '',
+       locations: {{ (prefs.preferred_locations or []) | tojson }},
+       remoteOk: {{ 'true' if prefs.remote_ok else 'false' }},
+       hybridOk: {{ 'true' if prefs.hybrid_ok else 'false' }},
+       threshold: {{ (prefs.alert_threshold or 60) | int }},
+       saving: false,
+       presets: ['python','javascript','typescript','react','node.js','java','c#','c++','go','rust','php','ruby','swift','kotlin','sql','postgresql','mysql','mongodb','redis','docker','kubernetes','aws','azure','gcp','terraform','linux','git','html','css','vue','angular','django','flask','fastapi','spring','.net','graphql','tensorflow','pytorch','pandas'],
+       get filteredPresets() {
+         const q = this.techSearch.toLowerCase().trim();
+         return this.presets.filter(t => !this.techs.includes(t) && (!q || t.includes(q))).slice(0, 12);
+       },
+       toggleTrack(t) {
+         this.tracks.includes(t) ? this.tracks = this.tracks.filter(x => x !== t) : this.tracks.push(t);
+       },
+       toggleLocation(l) {
+         this.locations.includes(l) ? this.locations = this.locations.filter(x => x !== l) : this.locations.push(l);
+       },
+       addTech(t) {
+         t = t.toLowerCase().trim();
+         if (t && !this.techs.includes(t)) this.techs.push(t);
+         this.techSearch = '';
+       },
+       removeTech(t) { this.techs = this.techs.filter(x => x !== t); },
+       async finish(skipped) {
+         if (this.saving) return;
+         this.saving = true;
+         const profile = skipped ? { onboarding_completed: true } : {
+           role_tracks: this.tracks,
+           experience_level: this.level,
+           preferred_tech: this.techs,
+           preferred_locations: this.locations,
+           remote_ok: this.remoteOk,
+           hybrid_ok: this.hybridOk,
+           alert_threshold: this.threshold,
+           onboarding_completed: true,
+         };
+         try {
+           const r = await fetch('/api/profile', {
+             method: 'POST',
+             headers: { 'Content-Type': 'application/json' },
+             body: JSON.stringify(profile),
+           });
+           const data = await r.json();
+           if (data.ok) {
+             try { localStorage.setItem('jh-profile', JSON.stringify(data.profile)); } catch (e) {}
+             window.location.href = '/';
+             return;
+           }
+           window.toast && toast('Could not save profile', 'error');
+         } catch (e) {
+           window.toast && toast('Could not save profile', 'error');
+         }
+         this.saving = false;
+       }
+     }">
+
+  {# Header + progress #}
+  <div class="mb-6 text-center">
+    <p class="text-sm font-semibold uppercase tracking-widest text-brand-600 dark:text-brand-400">Welcome to JobHunt</p>
+    <h1 class="mt-1 text-2xl font-extrabold tracking-tight text-slate-900 dark:text-white sm:text-3xl">Let's personalise your hunt 🎯</h1>
+    <p class="mt-1.5 text-sm text-slate-500 dark:text-slate-400">Five quick questions — every job gets ranked for you.</p>
+  </div>
+
+  <div class="mb-6 flex gap-1.5" aria-hidden="true">
+    <template x-for="i in 5" :key="i">
+      <div class="h-1.5 flex-1 rounded-full transition-colors duration-300"
+           :class="i <= step ? 'bg-brand-500' : 'bg-slate-200 dark:bg-slate-700'"></div>
+    </template>
+  </div>
+
+  <div class="card p-5 sm:p-7">
+
+    {# ===== Step 1: role tracks ===== #}
+    <section x-show="step === 1">
+      <h2 class="text-lg font-bold text-slate-900 dark:text-white">What kind of roles are you after?</h2>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Pick any that apply — matching jobs get a ranking boost.</p>
+      <div class="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-2">
+        {% for key, track in role_tracks.items() %}
+        <button type="button" @click="toggleTrack('{{ key }}')"
+                :class="tracks.includes('{{ key }}') ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/50' : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600'"
+                class="flex items-center gap-2.5 rounded-xl border-2 p-3.5 text-left transition">
+          <span class="text-xl" aria-hidden="true">{{ track.icon }}</span>
+          <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ track.label }}</span>
+        </button>
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ===== Step 2: experience level ===== #}
+    <section x-show="step === 2" x-cloak>
+      <h2 class="text-lg font-bold text-slate-900 dark:text-white">Where are you in your journey?</h2>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">This tunes how harshly senior-looking roles are ranked down.</p>
+      <div class="mt-4 space-y-2.5">
+        {% for val, label, desc in [
+          ("student", "Student", "Looking for internships, thesis work, or summer jobs"),
+          ("graduate", "Fresh graduate", "0–1 years — trainee and graduate programmes"),
+          ("junior", "Junior", "1–2 years of professional experience"),
+          ("mid", "Mid-level", "2–4 years — open to a bit more seniority"),
+        ] %}
+        <button type="button" @click="level = '{{ val }}'"
+                :class="level === '{{ val }}' ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/50' : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600'"
+                class="flex w-full items-center justify-between rounded-xl border-2 p-4 text-left transition">
+          <span>
+            <span class="block text-sm font-bold text-slate-800 dark:text-slate-200">{{ label }}</span>
+            <span class="block text-xs text-slate-500 dark:text-slate-400">{{ desc }}</span>
+          </span>
+          <span x-show="level === '{{ val }}'" class="text-brand-600 dark:text-brand-400" aria-hidden="true">✓</span>
+        </button>
+        {% endfor %}
+      </div>
+    </section>
+
+    {# ===== Step 3: tech stack ===== #}
+    <section x-show="step === 3" x-cloak>
+      <h2 class="text-lg font-bold text-slate-900 dark:text-white">Your tech stack</h2>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Jobs mentioning these score higher on tech match.</p>
+
+      <div class="mt-4" x-show="techs.length">
+        <div class="flex flex-wrap gap-1.5">
+          <template x-for="t in techs" :key="t">
+            <span class="chip border border-brand-500 bg-brand-50 px-3 py-1.5 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">
+              <span x-text="t"></span>
+              <button type="button" @click="removeTech(t)" class="ml-0.5 font-bold hover:text-brand-900" :aria-label="'Remove ' + t">✕</button>
+            </span>
+          </template>
+        </div>
+      </div>
+
+      <input type="text" x-model="techSearch" @keydown.enter.prevent="addTech(techSearch)"
+             placeholder="Search or type your own + Enter…" class="input mt-3">
+      <div class="mt-2.5 flex flex-wrap gap-1.5">
+        <template x-for="t in filteredPresets" :key="t">
+          <button type="button" @click="addTech(t)"
+                  class="chip border border-slate-200 bg-white px-3 py-1.5 text-slate-500 transition hover:border-brand-400 hover:text-brand-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400"
+                  x-text="t"></button>
+        </template>
+      </div>
+    </section>
+
+    {# ===== Step 4: location & work setup ===== #}
+    <section x-show="step === 4" x-cloak>
+      <h2 class="text-lg font-bold text-slate-900 dark:text-white">Where do you want to work?</h2>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Jobs in these places get a work-life boost.</p>
+      <div class="mt-4 flex flex-wrap gap-1.5">
+        {% for town in ["helsinki", "espoo", "vantaa", "tampere", "turku", "oulu", "bengaluru", "finland", "europe", "worldwide", "remote"] %}
+        <button type="button" @click="toggleLocation('{{ town }}')"
+                :class="locations.includes('{{ town }}') ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'"
+                class="chip border-2 px-3.5 py-2 capitalize transition">{{ town }}</button>
+        {% endfor %}
+      </div>
+      <div class="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+        <button type="button" @click="remoteOk = !remoteOk"
+                :class="remoteOk ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'"
+                class="rounded-xl border-2 p-4 text-left transition">
+          <span class="block text-sm font-bold text-slate-800 dark:text-slate-200">🌍 Remote-friendly</span>
+          <span class="block text-xs text-slate-500 dark:text-slate-400">Boost fully remote roles</span>
+        </button>
+        <button type="button" @click="hybridOk = !hybridOk"
+                :class="hybridOk ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/40' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'"
+                class="rounded-xl border-2 p-4 text-left transition">
+          <span class="block text-sm font-bold text-slate-800 dark:text-slate-200">🏢 Hybrid-friendly</span>
+          <span class="block text-xs text-slate-500 dark:text-slate-400">Boost hybrid roles</span>
+        </button>
+      </div>
+    </section>
+
+    {# ===== Step 5: alerts + summary ===== #}
+    <section x-show="step === 5" x-cloak>
+      <h2 class="text-lg font-bold text-slate-900 dark:text-white">Stay in the loop 🔔</h2>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Only great matches should interrupt you.</p>
+
+      <div class="mt-4">
+        <label class="label">Alert me about new jobs scoring at least
+          <span class="text-brand-600 dark:text-brand-400" x-text="threshold"></span>/100</label>
+        <input type="range" min="0" max="100" step="5" x-model.number="threshold"
+               class="w-full accent-brand-600" aria-label="Alert threshold">
+        <div class="flex justify-between text-[11px] text-slate-400"><span>Everything</span><span>Only the best</span></div>
+      </div>
+
+      <div class="mt-5 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800/60">
+        <p class="font-bold text-slate-800 dark:text-slate-200">Your setup</p>
+        <ul class="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
+          <li>🎯 <span x-text="tracks.length ? tracks.join(', ') : 'all role types'"></span></li>
+          <li>📈 <span x-text="level"></span></li>
+          <li>🛠️ <span x-text="techs.length ? techs.slice(0, 6).join(', ') + (techs.length > 6 ? '…' : '') : 'any stack'"></span></li>
+          <li>📍 <span x-text="locations.length ? locations.join(', ') : 'anywhere'"></span>
+            <span x-show="remoteOk">· remote</span><span x-show="hybridOk">· hybrid</span></li>
+        </ul>
+      </div>
+    </section>
+
+    {# Navigation #}
+    <div class="mt-7 flex items-center justify-between gap-3">
+      <button type="button" x-show="step > 1" @click="step--" class="btn-ghost">← Back</button>
+      <button type="button" x-show="step === 1" @click="finish(true)" class="btn-ghost text-slate-400">Skip setup</button>
+      <button type="button" x-show="step < 5" @click="step++" class="btn-primary ml-auto">Continue →</button>
+      <button type="button" x-show="step === 5" @click="finish(false)" :disabled="saving" class="btn-primary ml-auto">
+        <span x-show="!saving">Start hunting 🚀</span>
+        <span x-show="saving">Saving…</span>
+      </button>
+    </div>
+  </div>
+
+  <p class="mt-4 text-center text-xs text-slate-400 dark:text-slate-500">
+    You can change everything later on the Profile page.
+  </p>
+</div>
+{% endblock %}

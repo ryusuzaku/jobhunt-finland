@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     app_name: str = "JobHunt Finland"
     debug: bool = False
 
+    # Optional "Support this project" link (Ko-fi / Sponsors / ...).
+    # Shown in the footer and empty states when set; hidden otherwise.
+    support_url: str = ""
+
     # Dashboard pagination
     dashboard_page_size: int = 50
 

@@ -11,6 +11,11 @@ DEFAULT_PREFERENCES = {
     "remote_ok": settings.default_remote_ok,
     "hybrid_ok": settings.default_hybrid_ok,
     "alert_threshold": settings.alert_threshold,
+    # Onboarding profile (empty/absent = current behaviour, no personalization)
+    "role_tracks": [],                # e.g. ["software", "data"]
+    "experience_level": "junior",     # student | graduate | junior | mid
+    "onboarding_completed": False,
+    "profile_updated_at": "",         # ISO timestamp, used for local-first sync
 }
 
 

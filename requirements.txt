@@ -8,3 +8,6 @@ pydantic>=2.7.0
 pydantic-settings>=2.3.0
 python-multipart>=0.0.9
 beautifulsoup4>=4.12.0
+
+# Dev-only: regenerate PWA icons via scripts/make_icons.py (not needed at runtime)
+pillow>=10.0.0

@@ -1,13 +1,16 @@
-# 🇫🇮 JobHunt Finland
+# ⚡ JobHunt
 
-A self-hosted job-hunting agent that aggregates junior-level tech positions in Finland (plus selected global remote roles) and ranks them by what actually matters for early-career developers.
+A self-hosted, installable (PWA) job-hunting app that aggregates junior-level tech positions in Finland & Bengaluru (plus selected global remote roles) and ranks them by what actually matters for early-career developers.
 
 ## What it does
 
+- **Onboards you in 5 questions** — role tracks, experience level, tech stack, locations, and work setup — then ranks every job for *you*. No config files to edit.
 - Fetches jobs automatically every hour from 14 sources, including Indian boards (Bengaluru) and Finnish IT companies' own career pages.
 - De-duplicates the same role posted on multiple boards, keeping the best link (company career page preferred over aggregators).
 - Filters out Indian staffing-agency reposts ("Hiring For ...", "Manpower", "Placements", "Walk-in") so only direct-employer listings remain.
-- Scores each job on a 0–100 scale using four transparent signals:
+- **Installs on your phone** like a native app (PWA): home-screen icon, offline reading of previously loaded pages, dark mode.
+- **Local-first profile**: your answers live on your device and sync to the server — the seam for optional cloud sync later (see `docs/PRODUCT.md`).
+- Scores each job on a 0–100 scale using four transparent signals (tap the score ring for the breakdown):
   1. **Learning & growth potential** (junior/trainee/mentor language, career progression)
   2. **Work-life / location fit** (remote/hybrid, flexible hours, preferred cities)
   3. **Tech-stack match** (your preferred technologies)
@@ -71,7 +74,15 @@ chmod +x setup.sh start_server.sh stop_server.sh server_status.sh
 ./start_server.sh
 ```
 
-Then open http://127.0.0.1:8006/ in your browser.
+Then open http://127.0.0.1:8006/ in your browser — the **onboarding wizard** runs on first visit and personalises the ranking in about a minute.
+
+### Install as an app (PWA)
+
+- **Android/Chrome**: open the dashboard → menu → *Install app* (or tap the install button in the nav when it appears).
+- **iOS/Safari**: open the dashboard → Share → *Add to Home Screen*.
+- **Desktop Chrome/Edge**: install icon in the address bar.
+
+The installed app works offline for previously loaded pages and syncs your profile when back online.
 
 ### Optional: auto-restart watchdog
 
@@ -147,23 +158,47 @@ DEFAULT_PREFERRED_LOCATIONS=helsinki,espoo,vantaa,tampere,turku,oulu
 
 Only new jobs with a score ≥ `ALERT_THRESHOLD` trigger alerts.
 
+## Frontend architecture
+
+The UI is server-rendered Jinja2 with a compiled Tailwind CSS design system — no Node.js required:
+
+- `src/templates/base.html` — shared shell: responsive nav + mobile bottom tab bar, dark-mode bootstrap, toasts.
+- `src/templates/components.html` — Jinja macros: job card, score ring (+ “Why this score” popover), filter drawer, pagination, stat cards, empty states.
+- `src/static/app.css` — **compiled** Tailwind output (committed; includes the vendored Inter font and component classes).
+- `src/static/vendor/alpine.min.js` — vendored Alpine.js for wizard steps, drawers, and popovers.
+- `src/static/sw.js` + `manifest.webmanifest` — PWA service worker (app-shell precache, network-first pages) and install manifest.
+- `src/static/js/app.js` / `profile.js` — UI helpers (theme, toasts, refresh, install prompt) and the local-first profile sync layer.
+
+**Rebuilding the CSS** (only needed after editing templates/styles):
+
+```powershell
+# one-time: download the Tailwind standalone CLI (v3.4) into tools/
+# https://github.com/tailwindlabs/tailwindcss/releases/download/v3.4.17/tailwindcss-windows-x64.exe
+.\tools\tailwindcss.exe -i src\static\css\input.css -o src\static\app.css --minify
+```
+
+Regenerate PWA icons with `python scripts/make_icons.py` (needs Pillow).
+
 ## Project structure
 
 ```
 jobhunt/
 ├── src/
-│   ├── main.py              # FastAPI app, dashboard, API endpoints
-│   ├── scraper.py           # Multi-source orchestrator + DB upsert
-│   ├── scorer.py            # Heuristic scoring + salary extraction
+│   ├── main.py              # FastAPI app, routes, server-side filtering, profile API
+│   ├── scraper.py           # Multi-source orchestrator + dedup + DB upsert
+│   ├── scorer.py            # Heuristic scoring + role tracks + salary extraction
 │   ├── cache.py             # HTTP response cache + per-source job snapshots
 │   ├── models.py            # SQLAlchemy models
 │   ├── alerts.py            # Console/email/Discord/Slack alerts
 │   ├── config.py            # Settings
-│   ├── preferences.py       # User preference storage
+│   ├── preferences.py       # Profile/preference storage (key-value JSON rows)
 │   ├── sources/             # One module per data source
-│   └── templates/           # Jinja2 dashboard pages
+│   ├── static/              # Compiled CSS, vendored JS/fonts, PWA files, icons
+│   └── templates/           # base.html + components.html + thin pages
 ├── data/                    # SQLite DB + response cache (created on first run)
 │   └── finnish_companies.json  # Curated Finnish IT employer list for the career-page scraper
+├── docs/PRODUCT.md          # Monetization & multi-user model (free local-first, paid cloud saves)
+├── scripts/make_icons.py    # Regenerate PWA icons
 ├── logs/                    # Uvicorn logs (created on first run)
 ├── requirements.txt
 ├── setup.ps1 / setup.sh     # One-time install scripts
@@ -202,6 +237,10 @@ Set the relevant environment variables in `.env`; leave channels blank to disabl
 
 ## Roadmap / ideas
 
+- [x] Onboarding questionnaire that personalises ranking
+- [x] Installable PWA with offline shell + dark mode
+- [x] Server-side, shareable filtering (fixed client-side/pagination mismatch)
+- [ ] Hosted multi-user version with optional paid cloud saves (see `docs/PRODUCT.md`)
 - [ ] Integrate Oikotie Työpaikat via a headless browser or public feed
 - [ ] Integrate TE-palvelut / Työmarkkinatori when API access is available
 - [ ] Integrate TimesJobs / Naukri / Hirist / Foundit / CutShort if stable public endpoints or API credentials become available

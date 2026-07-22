@@ -34,6 +34,69 @@ GOOD_PERKS = [
     "pension", "bonus", "equity", "stock", "learning", "conference",
 ]
 
+# Onboarding role tracks -> keywords that indicate a job belongs to the track.
+# Used for a small additive bonus so picking tracks never lowers existing scores.
+ROLE_TRACKS = {
+    "software": {
+        "label": "Software / Backend",
+        "icon": "💻",
+        "keywords": ["software", "backend", "back-end", "full stack", "full-stack",
+                      "fullstack", "api developer", "server", "embedded"],
+    },
+    "frontend": {
+        "label": "Frontend / Web",
+        "icon": "🎨",
+        "keywords": ["frontend", "front-end", "web developer", "web development",
+                      "react", "vue", "angular", "typescript", "javascript", "css"],
+    },
+    "data": {
+        "label": "Data / AI / ML",
+        "icon": "🤖",
+        "keywords": ["data engineer", "data scientist", "machine learning", "ml engineer",
+                      "ai engineer", "analytics", "etl", "data analyst", "data platform",
+                      "deep learning", "nlp", "data"],
+    },
+    "devops": {
+        "label": "DevOps / Cloud",
+        "icon": "☁️",
+        "keywords": ["devops", "cloud", "infrastructure", "kubernetes", "docker",
+                      "aws", "azure", "gcp", "sre", "platform engineer", "ci/cd",
+                      "terraform"],
+    },
+    "mobile": {
+        "label": "Mobile",
+        "icon": "📱",
+        "keywords": ["android", "ios", "mobile", "kotlin", "swift", "flutter",
+                      "react native"],
+    },
+    "qa": {
+        "label": "QA / Testing",
+        "icon": "🧪",
+        "keywords": ["qa", "test engineer", "testing", "quality assurance",
+                      "test automation", "sdet"],
+    },
+    "design": {
+        "label": "Design / UX",
+        "icon": "✏️",
+        "keywords": ["designer", "ux", "ui design", "product design", "figma",
+                      "user experience"],
+    },
+    "security": {
+        "label": "Security",
+        "icon": "🔒",
+        "keywords": ["security", "infosec", "cybersecurity", "cyber security",
+                      "pentest", "secops", "soc analyst"],
+    },
+}
+
+# How strongly each experience level penalizes senior-looking roles.
+EXPERIENCE_PENALTY_FACTOR = {
+    "student": 1.3,
+    "graduate": 1.15,
+    "junior": 1.0,
+    "mid": 0.6,
+}
+
 
 def _normalize(text: str) -> str:
     return re.sub(r"[^\w\s\+#.]", " ", text.lower())
@@ -260,9 +323,32 @@ def score_job(
             pass
     company_score = min(100, company_score)
 
-    # Seniority penalty (0-60, subtracted from final)
+    # Seniority penalty (0-60, subtracted from final), scaled by the
+    # user's experience level (students feel senior roles harder).
     senior_matches = _count_matches(full_text, SENIOR_NEGATIVE)
-    penalty = min(60, senior_matches * 15)
+    level = prefs.get("experience_level", "junior")
+    penalty_factor = EXPERIENCE_PENALTY_FACTOR.get(level, 1.0)
+    penalty = min(60, senior_matches * 15 * penalty_factor)
+
+    # Role-track bonus (additive; only when the user picked tracks, so
+    # default behaviour is unchanged). Title matches count double.
+    track_bonus = 0
+    chosen_tracks = prefs.get("role_tracks") or []
+    if chosen_tracks:
+        title_norm = _normalize(title)
+        track_hits = 0
+        for track in chosen_tracks:
+            info = ROLE_TRACKS.get(track)
+            if not info:
+                continue
+            for kw in info["keywords"]:
+                pattern = r"\b" + re.escape(kw.lower()) + r"\b"
+                if re.search(pattern, norm_text):
+                    track_hits += 1
+                    if re.search(pattern, title_norm):
+                        track_hits += 1  # title match counts double
+                    break  # one hit per track is enough
+        track_bonus = min(15, track_hits * 6)
 
     # Weighted final score
     weighted = (
@@ -271,7 +357,7 @@ def score_job(
         + tech_score * settings.weight_tech
         + company_score * settings.weight_company
     )
-    final = max(0, min(100, weighted - penalty))
+    final = max(0, min(100, weighted - penalty + track_bonus))
 
     return {
         "score": round(final, 1),

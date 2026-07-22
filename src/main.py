@@ -2,10 +2,11 @@ import asyncio
 import logging
 import sys
 from contextlib import asynccontextmanager
+from urllib.parse import urlencode
 from datetime import datetime
 
 from fastapi import FastAPI, Request, Depends, Form
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import or_
@@ -18,6 +19,7 @@ from src.scorer import score_job
 from src.scraper import fetch_all_jobs, save_jobs, prune_stale_jobs, dedupe_jobs
 from src.alerts import send_console_alerts, send_email_alerts, send_discord_alerts, send_slack_alerts
 from src.preferences import get_preferences, set_preferences
+from src.scorer import ROLE_TRACKS
 
 # Scraped job titles may contain characters the Windows console encoding
 # (e.g. cp932) cannot represent; reconfigure std streams so logging/prints
@@ -101,17 +103,75 @@ def _allowed_location_clause():
     )
 
 
-def _dashboard_context(request: Request, db: Session, page: int = 1):
+def _csv(value: str | None) -> list[str]:
+    """Parse a comma-separated query param into a clean list."""
+    if not value:
+        return []
+    return [v.strip().lower() for v in value.split(",") if v.strip()]
+
+
+def _jobs_context(
+    request: Request,
+    db: Session,
+    page: int = 1,
+    bengaluru_only: bool = False,
+    q: str = "",
+    min_score: float = 0.0,
+    sources: str = "",
+    locations: str = "",
+    work: str = "",
+):
+    """Shared dashboard context with server-side filtering.
+
+    Filters arrive as query params so filtered views are shareable URLs
+    and pagination stays consistent (no client-side-only filtering).
+    """
     page_size = settings.dashboard_page_size
-    base_query = db.query(Job).filter(
-        Job.hidden == False, _allowed_location_clause()
-    )
-    total_jobs = base_query.count()
+    active_sources = _csv(sources)
+    active_locations = _csv(locations)
+    active_work = _csv(work)
+
+    query = db.query(Job).filter(Job.hidden == False)
+    if bengaluru_only:
+        query = query.filter(
+            or_(Job.location.ilike("%bengaluru%"), Job.location.ilike("%bangalore%"))
+        )
+    else:
+        query = query.filter(_allowed_location_clause())
+
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            or_(
+                Job.title.ilike(like),
+                Job.company.ilike(like),
+                Job.location.ilike(like),
+            )
+        )
+    if min_score:
+        query = query.filter(Job.score >= min_score)
+    if active_sources:
+        query = query.filter(Job.source.in_(active_sources))
+    if active_locations:
+        query = query.filter(
+            or_(*[Job.location.ilike(f"%{loc}%") for loc in active_locations])
+        )
+    if active_work:
+        work_conds = []
+        if "remote" in active_work:
+            work_conds.append(Job.remote == True)
+        if "hybrid" in active_work:
+            work_conds.append(Job.hybrid == True)
+        if work_conds:
+            query = query.filter(or_(*work_conds))
+
+    total_jobs = query.count()
+    new_count = query.filter(Job.is_new == True).count()
     total_pages = max(1, (total_jobs + page_size - 1) // page_size)
     page = max(1, min(page, total_pages))
 
     jobs = (
-        base_query.order_by(Job.score.desc(), Job.date_posted.desc())
+        query.order_by(Job.score.desc(), Job.date_posted.desc())
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
@@ -121,22 +181,48 @@ def _dashboard_context(request: Request, db: Session, page: int = 1):
     prefs = get_preferences(db)
 
     # Distinct sources in the whole DB so filters show every source,
-    # not just the ones that happen to be in the top 100.
-    sources = sorted(
+    # not just the ones that happen to be in the top results.
+    all_sources = sorted(
         {row[0] for row in db.query(Job.source).distinct() if row[0]}
+    )
+
+    base_qs = urlencode(
+        {
+            "q": q,
+            "min_score": int(min_score),
+            "sources": ",".join(active_sources),
+            "locations": ",".join(active_locations),
+            "work": ",".join(active_work),
+        }
     )
 
     return {
         "request": request,
         "jobs": jobs,
         "avg_score": avg_score,
+        "new_count": new_count,
         "settings": settings,
         "prefs": prefs,
-        "sources": sources,
+        "sources": all_sources,
+        "locations": settings.allowed_dashboard_locations,
         "page": page,
         "total_pages": total_pages,
         "total_jobs": total_jobs,
+        "q": q,
+        "min_score": int(min_score),
+        "active_sources": active_sources,
+        "active_locations": active_locations,
+        "active_work": active_work,
+        "base_qs": base_qs,
     }
+
+
+@app.get("/offline", response_class=HTMLResponse)
+def offline_page(request: Request):
+    """Fallback page served by the service worker when the network is down."""
+    return templates.TemplateResponse(
+        request, "offline.html", {"request": request, "settings": settings}
+    )
 
 
 @app.get("/api/locations")
@@ -158,54 +244,47 @@ def api_locations(db: Session = Depends(get_db)):
 
 
 @app.get("/", response_class=HTMLResponse)
-def dashboard(request: Request, page: int = 1, db: Session = Depends(get_db)):
+def dashboard(
+    request: Request,
+    page: int = 1,
+    q: str = "",
+    min_score: float = 0.0,
+    sources: str = "",
+    locations: str = "",
+    work: str = "",
+    db: Session = Depends(get_db),
+):
+    # First visit: guide the user through the onboarding questionnaire.
+    prefs = get_preferences(db)
+    if not prefs.get("onboarding_completed"):
+        return RedirectResponse(url="/onboarding", status_code=303)
     return templates.TemplateResponse(
         request,
         "index.html",
-        _dashboard_context(request, db, page=page),
+        _jobs_context(
+            request, db, page=page, q=q, min_score=min_score,
+            sources=sources, locations=locations, work=work,
+        ),
     )
-
-
-def _bengaluru_context(request: Request, db: Session, page: int = 1):
-    page_size = settings.dashboard_page_size
-    base_query = db.query(Job).filter(
-        Job.hidden == False,
-        or_(Job.location.ilike("%bengaluru%"), Job.location.ilike("%bangalore%")),
-    )
-    total_jobs = base_query.count()
-    total_pages = max(1, (total_jobs + page_size - 1) // page_size)
-    page = max(1, min(page, total_pages))
-
-    jobs = (
-        base_query.order_by(Job.score.desc(), Job.date_posted.desc())
-        .offset((page - 1) * page_size)
-        .limit(page_size)
-        .all()
-    )
-    scores = [j.score for j in jobs]
-    avg_score = round(sum(scores) / len(scores), 0) if scores else 0
-    prefs = get_preferences(db)
-    sources = sorted({row[0] for row in db.query(Job.source).distinct() if row[0]})
-
-    return {
-        "request": request,
-        "jobs": jobs,
-        "avg_score": avg_score,
-        "settings": settings,
-        "prefs": prefs,
-        "sources": sources,
-        "page": page,
-        "total_pages": total_pages,
-        "total_jobs": total_jobs,
-    }
 
 
 @app.get("/bengaluru", response_class=HTMLResponse)
-def bengaluru(request: Request, page: int = 1, db: Session = Depends(get_db)):
+def bengaluru(
+    request: Request,
+    page: int = 1,
+    q: str = "",
+    min_score: float = 0.0,
+    sources: str = "",
+    work: str = "",
+    db: Session = Depends(get_db),
+):
     return templates.TemplateResponse(
         request,
         "bengaluru.html",
-        _bengaluru_context(request, db, page=page),
+        _jobs_context(
+            request, db, page=page, bengaluru_only=True, q=q,
+            min_score=min_score, sources=sources, work=work,
+        ),
     )
 
 
@@ -221,6 +300,65 @@ def preferences_page(request: Request, db: Session = Depends(get_db)):
             "settings": settings,
         },
     )
+
+
+@app.get("/onboarding", response_class=HTMLResponse)
+def onboarding_page(request: Request, db: Session = Depends(get_db)):
+    prefs = get_preferences(db)
+    return templates.TemplateResponse(
+        request,
+        "onboarding.html",
+        {
+            "request": request,
+            "prefs": prefs,
+            "settings": settings,
+            "role_tracks": ROLE_TRACKS,
+        },
+    )
+
+
+_PROFILE_KEYS = {
+    "role_tracks",
+    "experience_level",
+    "preferred_tech",
+    "preferred_locations",
+    "remote_ok",
+    "hybrid_ok",
+    "alert_threshold",
+    "onboarding_completed",
+}
+
+
+@app.get("/api/profile")
+def api_profile_get(db: Session = Depends(get_db)):
+    """Return the current user profile (used by the local-first sync layer)."""
+    prefs = get_preferences(db)
+    return {key: prefs.get(key) for key in sorted(_PROFILE_KEYS | {"profile_updated_at"})}
+
+
+@app.post("/api/profile")
+async def api_profile_save(request: Request, db: Session = Depends(get_db)):
+    """Save a profile from onboarding or the local-first sync layer.
+
+    Accepts a JSON object with any of the profile keys; stamps
+    profile_updated_at (last-write-wins sync) and re-scores in the background.
+    """
+    try:
+        payload = await request.json()
+    except Exception:
+        return JSONResponse({"ok": False, "error": "invalid JSON"}, status_code=400)
+
+    updates = {k: v for k, v in payload.items() if k in _PROFILE_KEYS}
+    if not updates:
+        return JSONResponse({"ok": False, "error": "no valid profile keys"}, status_code=400)
+
+    updates["profile_updated_at"] = datetime.now().isoformat(timespec="seconds")
+    prefs = set_preferences(db, updates)
+
+    # Re-score existing jobs in the background so the save returns instantly.
+    scheduler.add_job(_rescore_all_jobs)
+
+    return {"ok": True, "profile": {key: prefs.get(key) for key in sorted(_PROFILE_KEYS | {"profile_updated_at"})}}
 
 
 @app.post("/preferences")

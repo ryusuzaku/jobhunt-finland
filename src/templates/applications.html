@@ -1,139 +1,112 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Applications — {{ settings.app_name }}</title>
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Inter', sans-serif; }</style>
-</head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
-    <header class="bg-slate-900 text-white sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-            <a href="/" class="flex items-center gap-3">
-                <img src="/static/favicon.svg" alt="" class="w-10 h-10 rounded-xl bg-white p-1 shadow-sm">
-                <div>
-                    <h1 class="text-lg font-bold tracking-tight">{{ settings.app_name }}</h1>
-                    <p class="text-slate-400 text-xs">Junior tech jobs in Finland &amp; Bengaluru</p>
-                </div>
-            </a>
-            <nav class="flex items-center gap-6 text-sm font-medium">
-                <a href="/" class="text-slate-300 hover:text-white transition">Dashboard</a>
-                <a href="/bengaluru" class="text-slate-300 hover:text-white transition">Bengaluru</a>
-                <a href="/applications" class="text-white hover:text-blue-300 transition">Applications</a>
-                <a href="/preferences" class="text-slate-300 hover:text-white transition">Preferences</a>
-                <a href="/docs" class="text-slate-300 hover:text-white transition">API Docs</a>
-            </nav>
-        </div>
-    </header>
+{% extends "base.html" %}
+{% import "components.html" as ui with context %}
 
-    <section class="bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-700 text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">Application tracker</h2>
-            <p class="text-indigo-100 max-w-2xl text-lg">Log where you've applied, update statuses, and record outcomes.</p>
-        </div>
-    </section>
+{% block title %}Tracker — JobHunt{% endblock %}
 
-    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {% for status in statuses %}
-        {% set apps = grouped.get(status, []) %}
-        <section class="mb-10">
-            <div class="flex items-center gap-3 mb-4">
-                <h3 class="text-xl font-bold text-slate-900 capitalize">{{ status }}</h3>
-                <span class="bg-slate-200 text-slate-700 text-xs font-bold px-2.5 py-1 rounded-full">{{ apps|length }}</span>
+{% block content %}
+<section class="relative mt-6 overflow-hidden rounded-3xl bg-gradient-to-br from-indigo-600 via-violet-600 to-fuchsia-700 px-6 py-8 text-white shadow-lift sm:px-8">
+  <div class="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-2xl"></div>
+  <div class="relative">
+    <h1 class="text-2xl font-extrabold tracking-tight sm:text-3xl">Application tracker 📋</h1>
+    <p class="mt-1.5 max-w-xl text-sm text-white/80 sm:text-base">Log where you've applied, update statuses, and record outcomes.</p>
+  </div>
+</section>
+
+{% set status_styles = {
+  "saved": "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+  "applied": "bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300",
+  "interview": "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
+  "offer": "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400",
+  "rejected": "bg-rose-50 text-rose-600 dark:bg-rose-950/50 dark:text-rose-400",
+  "withdrawn": "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400",
+  "ghosted": "bg-slate-100 text-slate-400 dark:bg-slate-800 dark:text-slate-500",
+} %}
+
+{% set any_apps = grouped.values() | map('length') | sum %}
+
+{% if not any_apps %}
+{{ ui.empty_state("Nothing tracked yet", "Hit “Track” on any job card to start logging applications here.", "inbox") }}
+{% else %}
+<div class="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+  {% for status in statuses %}
+  {% set apps = grouped.get(status, []) %}
+  {% if apps %}
+  <section class="card self-start p-4">
+    <div class="mb-3 flex items-center gap-2 px-1">
+      <span class="chip {{ status_styles.get(status, '') }} capitalize">{{ status }}</span>
+      <span class="text-xs font-bold text-slate-400">{{ apps | length }}</span>
+    </div>
+
+    <div class="space-y-3">
+      {% for app in apps %}
+      {% set job = app.job %}
+      <article class="rounded-xl border border-slate-200/80 bg-slate-50/50 p-3.5 dark:border-slate-700/60 dark:bg-slate-800/40" x-data="{ edit: false }">
+        <div class="flex items-start gap-3">
+          <div class="min-w-0 flex-1">
+            <h4 class="text-sm font-bold leading-snug text-slate-900 dark:text-white">
+              <a href="{{ job.url }}" target="_blank" rel="noopener" class="hover:text-brand-600 dark:hover:text-brand-400">{{ job.title }}</a>
+            </h4>
+            <p class="mt-0.5 truncate text-xs text-slate-500 dark:text-slate-400">{{ job.company }} · {{ job.location }}</p>
+            <div class="mt-1.5 flex flex-wrap gap-1">
+              <span class="chip bg-slate-100 text-slate-500 dark:bg-slate-700/60 dark:text-slate-300">{{ job.source }}</span>
+              {% if job.remote %}<span class="chip bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400">Remote</span>{% endif %}
+              {% if job.hybrid %}<span class="chip bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400">Hybrid</span>{% endif %}
             </div>
-
-            {% if apps %}
-            <div class="space-y-4">
-                {% for app in apps %}
-                {% set job = app.job %}
-                {% set circ = 87.965 %}
-                {% set offset = circ - (job.score / 100.0) * circ %}
-                <article class="bg-white rounded-2xl shadow-sm border border-slate-200 p-5">
-                    <div class="flex flex-col lg:flex-row gap-6 justify-between">
-                        <div class="flex-1 min-w-0">
-                            <div class="flex items-start justify-between gap-3">
-                                <h4 class="text-lg font-bold text-slate-900 leading-snug">
-                                    <a href="{{ job.url }}" target="_blank" rel="noopener" class="hover:text-blue-600 transition">{{ job.title }}</a>
-                                </h4>
-                                <div class="flex items-center gap-2 shrink-0">
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-100">{{ job.source }}</span>
-                                    {% if job.remote %}
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">Remote</span>
-                                    {% endif %}
-                                    {% if job.hybrid %}
-                                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-teal-50 text-teal-700 border border-teal-100">Hybrid</span>
-                                    {% endif %}
-                                </div>
-                            </div>
-                            <p class="text-slate-500 text-sm mt-1.5 flex flex-wrap items-center gap-2">
-                                <span class="font-medium text-slate-700">{{ job.company }}</span>
-                                <span class="text-slate-300">•</span>
-                                <span>{{ job.location }}</span>
-                                <span class="text-slate-300">•</span>
-                                <span>Score {{ job.score }}</span>
-                            </p>
-                            {% if app.notes %}
-                            <p class="mt-3 text-sm text-slate-700 bg-slate-50 rounded-lg p-3 border border-slate-100">{{ app.notes }}</p>
-                            {% endif %}
-                            {% if app.outcome %}
-                            <p class="mt-2 text-sm text-slate-600"><span class="font-semibold">Outcome:</span> {{ app.outcome }}</p>
-                            {% endif %}
-                        </div>
-                        <div class="flex flex-col items-center justify-center shrink-0">
-                            <div class="relative w-14 h-14">
-                                <svg class="w-14 h-14 -rotate-90" viewBox="0 0 36 36">
-                                    <circle cx="18" cy="18" r="14" fill="none" stroke="#e2e8f0" stroke-width="4"></circle>
-                                    <circle cx="18" cy="18" r="14" fill="none" stroke="#2563eb" stroke-width="4" stroke-linecap="round"
-                                        stroke-dasharray="{{ circ }}" stroke-dashoffset="{{ offset }}"></circle>
-                                </svg>
-                                <div class="absolute inset-0 flex items-center justify-center font-bold text-slate-900 text-xs">{{ job.score }}</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <form action="/applications/{{ app.id }}" method="post" class="mt-5 pt-5 border-t border-slate-100">
-                        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Status</label>
-                                <select name="status" class="w-full rounded-lg border-slate-300 text-sm py-2 px-3 border focus:border-blue-500 focus:ring-blue-500">
-                                    {% for s in statuses %}
-                                    <option value="{{ s }}" {% if s == app.status %}selected{% endif %}>{{ s|capitalize }}</option>
-                                    {% endfor %}
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Applied date</label>
-                                <input type="date" name="applied_at" value="{{ app.applied_at.strftime('%Y-%m-%d') if app.applied_at else '' }}" class="w-full rounded-lg border-slate-300 text-sm py-2 px-3 border focus:border-blue-500 focus:ring-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Closing date</label>
-                                <input type="date" name="closing_date" value="{{ app.closing_date.strftime('%Y-%m-%d') if app.closing_date else '' }}" class="w-full rounded-lg border-slate-300 text-sm py-2 px-3 border focus:border-blue-500 focus:ring-blue-500">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Outcome</label>
-                                <input type="text" name="outcome" value="{{ app.outcome or '' }}" placeholder="e.g. got offer" class="w-full rounded-lg border-slate-300 text-sm py-2 px-3 border focus:border-blue-500 focus:ring-blue-500">
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider">Notes</label>
-                            <textarea name="notes" rows="2" class="w-full rounded-lg border-slate-300 text-sm py-2 px-3 border focus:border-blue-500 focus:ring-blue-500">{{ app.notes or '' }}</textarea>
-                        </div>
-                        <div class="flex items-center justify-end gap-3">
-                            <button type="submit" formaction="/applications/{{ app.id }}/delete" formmethod="post" class="text-sm font-medium text-red-500 hover:text-red-700 px-3 py-2 rounded-lg hover:bg-red-50 transition" onclick="return confirm('Delete this application and return the job to the dashboard?')">Delete</button>
-                            <button type="submit" class="text-sm font-semibold bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition">Update application</button>
-                        </div>
-                    </form>
-                </article>
-                {% endfor %}
-            </div>
-            {% else %}
-            <p class="text-slate-500 text-sm">No applications in this stage yet.</p>
+            {% if app.notes %}
+            <p class="mt-2 rounded-lg bg-white p-2 text-xs text-slate-600 dark:bg-slate-900 dark:text-slate-300">{{ app.notes }}</p>
             {% endif %}
-        </section>
-        {% endfor %}
-    </main>
-</body>
-</html>
+            {% if app.outcome %}
+            <p class="mt-1.5 text-xs text-slate-600 dark:text-slate-300"><span class="font-semibold">Outcome:</span> {{ app.outcome }}</p>
+            {% endif %}
+          </div>
+          {{ ui.score_ring(job.score or 0, 44) }}
+        </div>
+
+        <button type="button" @click="edit = !edit" class="mt-2 text-xs font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400">
+          <span x-text="edit ? '▾ Close editor' : '▸ Edit'">▸ Edit</span>
+        </button>
+
+        <form x-show="edit" x-cloak action="/applications/{{ app.id }}" method="post"
+              class="mt-3 space-y-2.5 border-t border-slate-200 pt-3 dark:border-slate-700">
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="label !text-xs">Status</label>
+              <select name="status" class="input !py-1.5 !text-xs">
+                {% for s in statuses %}
+                <option value="{{ s }}" {% if s == app.status %}selected{% endif %}>{{ s | capitalize }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="label !text-xs">Outcome</label>
+              <input type="text" name="outcome" value="{{ app.outcome or '' }}" placeholder="e.g. got offer" class="input !py-1.5 !text-xs">
+            </div>
+            <div>
+              <label class="label !text-xs">Applied</label>
+              <input type="date" name="applied_at" value="{{ app.applied_at.strftime('%Y-%m-%d') if app.applied_at else '' }}" class="input !py-1.5 !text-xs">
+            </div>
+            <div>
+              <label class="label !text-xs">Closing</label>
+              <input type="date" name="closing_date" value="{{ app.closing_date.strftime('%Y-%m-%d') if app.closing_date else '' }}" class="input !py-1.5 !text-xs">
+            </div>
+          </div>
+          <div>
+            <label class="label !text-xs">Notes</label>
+            <textarea name="notes" rows="2" class="input !py-1.5 !text-xs">{{ app.notes or '' }}</textarea>
+          </div>
+          <div class="flex items-center justify-end gap-2">
+            <button type="submit" formaction="/applications/{{ app.id }}/delete" formmethod="post"
+                    class="btn-danger !px-3 !py-1.5 !text-xs"
+                    onclick="return confirm('Delete this application and return the job to the dashboard?')">Delete</button>
+            <button type="submit" class="btn-primary !px-3 !py-1.5 !text-xs">Update</button>
+          </div>
+        </form>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

@@ -17,3 +17,5 @@ logs/
 
 # Environment
 .env
+
+tools/

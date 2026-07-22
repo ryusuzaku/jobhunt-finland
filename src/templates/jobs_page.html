@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% import "components.html" as ui with context %}
+
+{% block content %}
+{# ============ Hero ============ #}
+<section class="relative mt-6 overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-indigo-600 to-violet-700 px-6 py-8 text-white shadow-lift sm:px-8">
+  <div class="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-2xl"></div>
+  <div class="pointer-events-none absolute -bottom-20 -left-10 h-56 w-56 rounded-full bg-violet-400/20 blur-2xl"></div>
+  <div class="relative">
+    <h1 class="text-2xl font-extrabold tracking-tight sm:text-3xl">{% block hero_title %}{% endblock %}</h1>
+    <p class="mt-1.5 max-w-xl text-sm text-white/80 sm:text-base">{% block hero_subtitle %}{% endblock %}</p>
+    <div class="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {{ ui.stat_card("Jobs shown", total_jobs, "text-white") }}
+      {{ ui.stat_card("New", new_count, "text-emerald-300") }}
+      {{ ui.stat_card("Avg score", avg_score | int, "text-white") }}
+      {{ ui.stat_card("Sources", sources | length, "text-white") }}
+    </div>
+  </div>
+</section>
+
+{# ============ Filters + job list ============ #}
+<div class="mt-6 lg:flex lg:items-start lg:gap-6">
+  {% block filters %}
+  {{ ui.filter_panel(request.url.path, sources, locations, q, min_score, active_sources, active_locations, active_work) }}
+  {% endblock %}
+
+  <div class="min-w-0 flex-1">
+    {% if jobs %}
+    <div id="job-list" class="space-y-4">
+      {% for job in jobs %}
+      {{ ui.job_card(job, loop.index0) }}
+      {% endfor %}
+    </div>
+    {{ ui.pagination(page, total_pages, base_qs) }}
+    <p class="mt-4 text-center text-xs text-slate-400 dark:text-slate-500">
+      Page {{ page }} of {{ total_pages }} · {{ total_jobs }} jobs match your filters
+    </p>
+    {% else %}
+    {{ ui.empty_state("No jobs match", "Try widening your filters — lower the minimum score, add more cities, or clear the search.") }}
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

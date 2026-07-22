@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>{% block title %}JobHunt{% endblock %}</title>
+  <meta name="description" content="Junior tech jobs, ranked by what matters for your growth.">
+  <meta name="theme-color" content="#4549e8">
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="manifest" href="/static/manifest.webmanifest">
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="/static/app.css">
+  <script>
+    // Anti-FOUC dark mode bootstrap (runs before first paint).
+    (function () {
+      try {
+        var t = localStorage.getItem("jh-theme");
+        if (t === "dark" || (!t && window.matchMedia("(prefers-color-scheme: dark)").matches)) {
+          document.documentElement.classList.add("dark");
+        }
+      } catch (e) {}
+    })();
+  </script>
+  <script defer src="/static/vendor/alpine.min.js"></script>
+  <script defer src="/static/js/profile.js"></script>
+  <script defer src="/static/js/app.js"></script>
+</head>
+<body class="min-h-screen font-sans flex flex-col">
+
+  {# ============ Desktop / mobile top navigation ============ #}
+  {% set nav = [
+    ("/", "Jobs", "M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"),
+    ("/bengaluru", "Bengaluru", "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z"),
+    ("/applications", "Tracker", "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"),
+    ("/preferences", "Profile", "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"),
+  ] %}
+
+  <header class="sticky top-0 z-40 border-b border-slate-200/70 bg-white/80 backdrop-blur-lg dark:border-slate-800 dark:bg-slate-900/80">
+    <div class="mx-auto flex h-14 max-w-7xl items-center gap-2 px-4 sm:px-6">
+      <a href="/" class="flex items-center gap-2 font-extrabold tracking-tight text-slate-900 dark:text-white">
+        <span class="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-brand-500 to-violet-600 text-white shadow-sm">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.2"><path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+        </span>
+        <span class="text-lg">JobHunt</span>
+      </a>
+
+      <nav class="ml-6 hidden items-center gap-1 md:flex" aria-label="Main">
+        {% for href, label, icon in nav %}
+        <a href="{{ href }}"
+           class="rounded-lg px-3 py-1.5 text-sm font-semibold transition {% if request.url.path == href %}bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300{% else %}text-slate-500 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white{% endif %}">
+          {{ label }}
+        </a>
+        {% endfor %}
+      </nav>
+
+      <div class="ml-auto flex items-center gap-1.5">
+        <button id="install-btn" type="button" class="btn-ghost hidden !px-2.5" title="Install app" aria-label="Install app">
+          <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M12 4v12m0 0l-4-4m4 4l4-4"/></svg>
+        </button>
+        <button id="refresh-btn" type="button" class="btn-ghost !px-2.5" title="Fetch latest jobs" aria-label="Fetch latest jobs">
+          <svg id="refresh-icon" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+        </button>
+        <button id="theme-toggle" type="button" class="btn-ghost !px-2.5" title="Toggle dark mode" aria-label="Toggle dark mode">
+          <svg class="h-5 w-5 dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/></svg>
+          <svg class="hidden h-5 w-5 dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  {# ============ Page content ============ #}
+  <main class="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 sm:px-6 md:pb-10">
+    {% block content %}{% endblock %}
+  </main>
+
+  {# ============ Footer ============ #}
+  <footer class="border-t border-slate-200/70 py-6 pb-24 md:pb-6 dark:border-slate-800">
+    <div class="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-6 gap-y-2 px-4 text-xs text-slate-400 dark:text-slate-500 sm:px-6">
+      <span>JobHunt — junior tech jobs, ranked for growth.</span>
+      <a href="/docs" class="hover:text-brand-500">API docs</a>
+      {% if settings.support_url %}
+      <a href="{{ settings.support_url }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 hover:text-brand-500">
+        <span aria-hidden="true">☕</span> Support this project
+      </a>
+      {% endif %}
+    </div>
+  </footer>
+
+  {# ============ Mobile bottom tab bar ============ #}
+  <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 backdrop-blur-lg pb-safe md:hidden dark:border-slate-800 dark:bg-slate-900/95" aria-label="Mobile">
+    <div class="grid grid-cols-4">
+      {% for href, label, icon in nav %}
+      <a href="{{ href }}" class="flex flex-col items-center gap-0.5 py-2 text-[10px] font-semibold {% if request.url.path == href %}text-brand-600 dark:text-brand-400{% else %}text-slate-400 dark:text-slate-500{% endif %}">
+        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="{{ icon }}"/></svg>
+        {{ label }}
+      </a>
+      {% endfor %}
+    </div>
+  </nav>
+
+  {# ============ Toast container ============ #}
+  <div id="toast-container" class="pointer-events-none fixed inset-x-0 bottom-20 z-50 flex flex-col items-center gap-2 px-4 md:bottom-6" aria-live="polite"></div>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>

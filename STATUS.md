@@ -1,6 +1,6 @@
 # Project Status — JobHunt Finland
 
-Last updated: 2026-07-22
+Last updated: 2026-07-22 (UI redesign)
 
 ## Current state
 
@@ -25,9 +25,21 @@ The project is a working, self-hosted FastAPI dashboard that aggregates and rank
 - ✅ Cross-source de-duplication: the same role at the same company posted on multiple boards is merged, keeping the best link (career page > board; tracked applications always survive).
 - ✅ Indian staffing-agency spam filter: consultancy reposts ("Hiring For ...", "Manpower", "Placements", "Walk-in") are dropped from Shine/Internshala.
 - ✅ Auto-restart watchdog: `watchdog.ps1`/`.sh` re-runs the start script when port 8006 is down; installable as a Windows Scheduled Task (`install_watchdog.ps1`) or cron entry (every 5 min + `@reboot`).
+- ✅ Product-grade UI redesign: shared base template + Jinja components, compiled Tailwind design system (no Node), mobile bottom tab bar, slide-over filter drawer, dark mode, toasts, skeleton loading.
+- ✅ Onboarding questionnaire: 5-step wizard (role tracks, experience level, tech stack, locations, alerts) drives personalized scoring via `/api/profile`.
+- ✅ Personalized scoring: role-track bonus (+12 for title matches) and experience-level-scaled seniority penalty; fully backward compatible when unset.
+- ✅ PWA: installable on phone/desktop, service worker with app-shell precache + offline fallback, generated brand icons, install prompt.
+- ✅ Local-first profile sync: profile mirrored to localStorage, last-write-wins sync with the server (`profile.js`) — the seam for future per-user cloud saves.
+- ✅ Server-side filtering: `?q=&min_score=&sources=&locations=&work=` query params; shareable URLs, pagination preserves filters.
+- ✅ Non-intrusive support link (`SUPPORT_URL`) in footer/empty states; monetization model documented in `docs/PRODUCT.md`.
 
 ## Recently completed
 
+- Rebuilt the entire frontend: base template + component macros (deleted ~700 lines of duplication), compiled Tailwind v3.4 CSS with vendored Inter font and Alpine.js.
+- Added the 5-step onboarding wizard, `/api/profile`, and scorer personalization (role tracks + experience levels).
+- Made the app an installable PWA (manifest, service worker, offline page, icons, local-first profile sync).
+- Switched dashboard filtering to server-side query params (fixes the client-filter vs pagination mismatch).
+- Added score-explanation popovers, structured salary chips, dark mode, toasts, skeleton loading, and a kanban-style tracker layout.
 - Added cross-source job de-duplication (normalized title + company fuzzy match; best-link keeper, tracked applications protected).
 - Added an Indian consultancy/staffing-agency spam filter for Shine and Internshala.
 - Added an auto-restart watchdog (Windows Scheduled Task / cron) after a machine-sleep incident silently stopped the server.

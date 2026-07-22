@@ -1,118 +1,72 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Preferences — {{ settings.app_name }}</title>
-    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>body { font-family: 'Inter', sans-serif; }</style>
-</head>
-<body class="bg-slate-50 text-slate-800 min-h-screen">
-    <header class="bg-slate-900 text-white sticky top-0 z-50">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex items-center justify-between">
-            <a href="/" class="flex items-center gap-3">
-                <img src="/static/favicon.svg" alt="" class="w-10 h-10 rounded-xl bg-white p-1 shadow-sm">
-                <div>
-                    <h1 class="text-lg font-bold tracking-tight">{{ settings.app_name }}</h1>
-                    <p class="text-slate-400 text-xs">Junior tech jobs in Finland &amp; Bengaluru</p>
-                </div>
-            </a>
-            <nav class="flex items-center gap-6 text-sm font-medium">
-                <a href="/" class="text-slate-300 hover:text-white transition">Dashboard</a>
-                <a href="/bengaluru" class="text-slate-300 hover:text-white transition">Bengaluru</a>
-                <a href="/applications" class="text-slate-300 hover:text-white transition">Applications</a>
-                <a href="/preferences" class="text-white hover:text-blue-300 transition">Preferences</a>
-                <a href="/docs" class="text-slate-300 hover:text-white transition">API Docs</a>
-            </nav>
-        </div>
-    </header>
+{% extends "base.html" %}
 
-    <section class="bg-gradient-to-br from-blue-600 via-indigo-600 to-violet-700 text-white">
-        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
-            <h2 class="text-3xl md:text-4xl font-extrabold tracking-tight mb-2">Preferences</h2>
-            <p class="text-blue-100 max-w-2xl text-lg">Tell us what matters and we’ll re-score every job in the database.</p>
-        </div>
-    </section>
+{% block title %}Profile — JobHunt{% endblock %}
 
-    <main class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <form method="post" action="/preferences" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-            <div class="p-6 sm:p-8 space-y-6">
-                <div>
-                    <label for="preferred_tech" class="block text-sm font-semibold text-slate-900">Preferred technologies</label>
-                    <input type="text" id="preferred_tech" name="preferred_tech" value="{{ prefs.preferred_tech|join(', ') }}"
-                        class="mt-2 w-full rounded-lg border-slate-300 focus:border-blue-500 focus:ring-blue-500 border px-4 py-2.5 text-sm">
-                    <p class="mt-1.5 text-xs text-slate-500">Comma-separated list, e.g. <span class="font-medium">python, javascript, react, sql</span></p>
-                </div>
+{% block content %}
+<section class="relative mt-6 overflow-hidden rounded-3xl bg-gradient-to-br from-brand-600 via-indigo-600 to-violet-700 px-6 py-8 text-white shadow-lift sm:px-8">
+  <div class="pointer-events-none absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/10 blur-2xl"></div>
+  <div class="relative">
+    <h1 class="text-2xl font-extrabold tracking-tight sm:text-3xl">Your profile ⚙️</h1>
+    <p class="mt-1.5 max-w-xl text-sm text-white/80 sm:text-base">Tune what you're looking for — every job is re-scored against these preferences.</p>
+  </div>
+</section>
 
-                <div>
-                    <label class="block text-sm font-semibold text-slate-900">Preferred towns / locations</label>
-                    <input type="hidden" id="preferred_locations" name="preferred_locations" value="{{ prefs.preferred_locations|join(', ') }}">
-                    <div id="town-checkboxes" class="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        {% for town in ['helsinki', 'espoo', 'vantaa', 'tampere', 'turku', 'oulu', 'bengaluru', 'finland', 'europe', 'worldwide', 'remote'] %}
-                        <label class="flex items-center gap-2 cursor-pointer">
-                            <input type="checkbox" value="{{ town }}" data-town-checkbox class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                            <span class="text-sm text-slate-700 capitalize">{{ town }}</span>
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <p class="mt-2 text-xs text-slate-500">Selected towns boost the work-life score for matching locations.</p>
-                </div>
+<form method="post" action="/preferences" class="mx-auto mt-6 max-w-2xl space-y-5"
+      x-data="{ towns: {{ (prefs.preferred_locations or []) | tojson }} }">
 
-                <div class="grid sm:grid-cols-2 gap-4">
-                    <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:border-blue-300 transition">
-                        <input type="checkbox" id="remote_ok" name="remote_ok" {% if prefs.remote_ok %}checked{% endif %} class="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        <div>
-                            <span class="block text-sm font-semibold text-slate-900">Boost remote jobs</span>
-                            <span class="block text-xs text-slate-500">Add points for fully remote roles</span>
-                        </div>
-                    </label>
-                    <label class="flex items-center gap-3 p-4 rounded-xl border border-slate-200 bg-slate-50 cursor-pointer hover:border-blue-300 transition">
-                        <input type="checkbox" id="hybrid_ok" name="hybrid_ok" {% if prefs.hybrid_ok %}checked{% endif %} class="w-5 h-5 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
-                        <div>
-                            <span class="block text-sm font-semibold text-slate-900">Boost hybrid jobs</span>
-                            <span class="block text-xs text-slate-500">Add points for hybrid roles</span>
-                        </div>
-                    </label>
-                </div>
+  <div class="card p-5">
+    <label for="preferred_tech" class="label">Preferred tech stack</label>
+    <input id="preferred_tech" type="text" name="preferred_tech"
+           value="{{ (prefs.preferred_tech or []) | join(', ') }}"
+           placeholder="python, javascript, react, docker…" class="input">
+    <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-500">Comma-separated. Jobs mentioning these score higher on tech match.</p>
+  </div>
 
-                <div>
-                    <label for="alert_threshold" class="block text-sm font-semibold text-slate-900">Alert threshold (0–100)</label>
-                    <div class="flex items-center gap-4 mt-2">
-                        <input type="number" id="alert_threshold" name="alert_threshold" min="0" max="100" value="{{ prefs.alert_threshold }}"
-                            class="w-32 rounded-lg border-slate-300 focus:border-blue-500 focus:ring-blue-500 border px-4 py-2.5 text-sm">
-                        <p class="text-xs text-slate-500">Only jobs scoring at or above this value trigger alerts.</p>
-                    </div>
-                </div>
-            </div>
+  <div class="card p-5">
+    <span class="label">Preferred locations</span>
+    <input type="hidden" name="preferred_locations" :value="towns.join(',')">
+    <div class="flex flex-wrap gap-1.5">
+      {% for town in ["helsinki", "espoo", "vantaa", "tampere", "turku", "oulu", "bengaluru", "finland", "europe", "worldwide", "remote"] %}
+      <label class="cursor-pointer">
+        <input type="checkbox" value="{{ town }}" class="peer sr-only"
+               :checked="towns.includes('{{ town }}')"
+               @change="$event.target.checked ? towns.push('{{ town }}') : towns = towns.filter(t => t !== '{{ town }}')">
+        <span class="chip border border-slate-200 bg-white px-3 py-1.5 capitalize text-slate-500 transition peer-checked:border-brand-500 peer-checked:bg-brand-50 peer-checked:text-brand-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:peer-checked:border-brand-500 dark:peer-checked:bg-brand-950/60 dark:peer-checked:text-brand-300">{{ town }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </div>
 
-            <div class="bg-slate-50 px-6 sm:px-8 py-5 border-t border-slate-200 flex items-center justify-between">
-                <a href="/" class="text-sm font-medium text-slate-500 hover:text-slate-800 transition">← Back to dashboard</a>
-                <button type="submit" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-6 rounded-xl transition shadow-sm">
-                    Save preferences &amp; re-score jobs
-                </button>
-            </div>
-        </form>
-    </main>
-    <script>
-        const hiddenInput = document.getElementById('preferred_locations');
-        const checkboxes = document.querySelectorAll('[data-town-checkbox]');
+  <div class="card grid grid-cols-1 gap-3 p-5 sm:grid-cols-2">
+    <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4 transition has-[:checked]:border-emerald-500 has-[:checked]:bg-emerald-50/50 dark:border-slate-700 dark:has-[:checked]:bg-emerald-950/30">
+      <input type="checkbox" name="remote_ok" class="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500" {% if prefs.remote_ok %}checked{% endif %}>
+      <span>
+        <span class="block text-sm font-semibold text-slate-800 dark:text-slate-200">Remote OK</span>
+        <span class="block text-xs text-slate-500 dark:text-slate-400">Fully remote roles score higher</span>
+      </span>
+    </label>
+    <label class="flex cursor-pointer items-center gap-3 rounded-xl border border-slate-200 p-4 transition has-[:checked]:border-sky-500 has-[:checked]:bg-sky-50/50 dark:border-slate-700 dark:has-[:checked]:bg-sky-950/30">
+      <input type="checkbox" name="hybrid_ok" class="h-4 w-4 rounded border-slate-300 text-sky-600 focus:ring-sky-500" {% if prefs.hybrid_ok %}checked{% endif %}>
+      <span>
+        <span class="block text-sm font-semibold text-slate-800 dark:text-slate-200">Hybrid OK</span>
+        <span class="block text-xs text-slate-500 dark:text-slate-400">Hybrid roles score higher</span>
+      </span>
+    </label>
+  </div>
 
-        function syncFromHidden() {
-            const selected = new Set(hiddenInput.value.split(',').map(s => s.trim().toLowerCase()).filter(Boolean));
-            checkboxes.forEach(cb => {
-                cb.checked = selected.has(cb.value);
-            });
-        }
+  <div class="card p-5">
+    <label for="alert_threshold" class="label">Alert threshold</label>
+    <input id="alert_threshold" type="number" name="alert_threshold" min="0" max="100" step="1"
+           value="{{ prefs.alert_threshold | int }}" class="input w-32">
+    <p class="mt-1.5 text-xs text-slate-400 dark:text-slate-500">Only new jobs scoring at or above this trigger alerts.</p>
+  </div>
 
-        function syncToHidden() {
-            const selected = [...checkboxes].filter(cb => cb.checked).map(cb => cb.value);
-            hiddenInput.value = selected.join(', ');
-        }
-
-        checkboxes.forEach(cb => cb.addEventListener('change', syncToHidden));
-        syncFromHidden();
-    </script>
-</body>
-</html>
+  <div class="flex items-center justify-between gap-3 pb-4">
+    <a href="/onboarding" class="text-sm font-semibold text-brand-600 hover:text-brand-700 dark:text-brand-400">↺ Re-run onboarding wizard</a>
+    <div class="flex items-center gap-3">
+      <a href="/" class="btn-ghost">Cancel</a>
+      <button type="submit" class="btn-primary">Save &amp; re-score jobs</button>
+    </div>
+  </div>
+</form>
+{% endblock %}
