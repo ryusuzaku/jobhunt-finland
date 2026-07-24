@@ -9,6 +9,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from src.config import settings
+from src.job_profiles import linkedin_terms
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,9 @@ class LinkedInSource:
     async def fetch(self, client: httpx.AsyncClient) -> list[dict]:
         global _rate_limited_until
 
+        # Profile-aware search terms (capped); legacy tech terms as default.
+        search_terms = linkedin_terms(getattr(self, "active_profiles", None)) or self.search_terms
+
         if self.is_rate_limited:
             logger.warning(
                 "LinkedIn is rate-limited; cooling down until %s",
@@ -87,7 +91,7 @@ class LinkedInSource:
             pages = loc_config["pages"]
             is_finland = "finland" in location.lower()
 
-            for term in self.search_terms:
+            for term in search_terms:
                 if rate_limited:
                     break
                 for page in range(pages):

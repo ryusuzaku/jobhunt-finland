@@ -32,11 +32,16 @@ The project is a working, self-hosted FastAPI dashboard that aggregates and rank
 - ✅ Local-first profile sync: profile mirrored to localStorage, last-write-wins sync with the server (`profile.js`) — the seam for future per-user cloud saves.
 - ✅ Server-side filtering: `?q=&min_score=&sources=&locations=&work=` query params; shareable URLs, pagination preserves filters.
 - ✅ Non-intrusive support link (`SUPPORT_URL`) in footer/empty states; monetization model documented in `docs/PRODUCT.md`.
+- ✅ Job profiles beyond IT: 19 selectable profiles in 6 groups (Tech, Design, Business, Engineering, Care & Education, Service) with curated English + Finnish keyword packs; fetching, filtering, search terms, and scoring all adapt to the selection. Empty selection = legacy tech-only behavior.
+- ✅ Sort control: order the feed by match score, date published, or company — preserved across pagination and shareable URLs.
+- ✅ Tracking visibility: tracked jobs show a status badge on the dashboard; applied-or-later jobs are filtered out of the feed by default (`?tracked=all` to see them); the old silent track-to-hide behavior is migrated automatically.
 
 ## Recently completed
 
 - Rebuilt the entire frontend: base template + component macros (deleted ~700 lines of duplication), compiled Tailwind v3.4 CSS with vendored Inter font and Alpine.js.
 - Added the 5-step onboarding wizard, `/api/profile`, and scorer personalization (role tracks + experience levels).
+- Generalized to job profiles beyond IT (`src/job_profiles.py`): profile registry with per-profile keyword packs (incl. Finnish compound-aware matching), profile-driven search terms for all query-driven sources, and a central keep-filter in the fetch pipeline.
+- Added sort controls (match / newest / company) and proper tracking visibility (badges + tracked filter + startup migration).
 - Made the app an installable PWA (manifest, service worker, offline page, icons, local-first profile sync).
 - Switched dashboard filtering to server-side query params (fixes the client-filter vs pagination mismatch).
 - Added score-explanation popovers, structured salary chips, dark mode, toasts, skeleton loading, and a kanban-style tracker layout.

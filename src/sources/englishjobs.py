@@ -6,6 +6,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from src.config import settings
+from src.job_profiles import en_search_terms
 from src.scorer import extract_salary
 
 logger = logging.getLogger(__name__)
@@ -19,7 +20,8 @@ class EnglishJobsSource:
 
     async def fetch(self, client: httpx.AsyncClient) -> list[dict]:
         results: list[dict] = []
-        for term in self.search_terms:
+        terms = en_search_terms(getattr(self, "active_profiles", None)) or self.search_terms
+        for term in terms:
             url = f"{settings.englishjobs_base_url}/{term}"
             try:
                 resp = await client.get(url, headers={"User-Agent": settings.user_agent})

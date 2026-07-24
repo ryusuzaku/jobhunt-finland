@@ -9,8 +9,8 @@ from fastapi import FastAPI, Request, Depends, Form
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session, joinedload
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from src.config import settings
@@ -19,7 +19,7 @@ from src.scorer import score_job
 from src.scraper import fetch_all_jobs, save_jobs, prune_stale_jobs, dedupe_jobs
 from src.alerts import send_console_alerts, send_email_alerts, send_discord_alerts, send_slack_alerts
 from src.preferences import get_preferences, set_preferences
-from src.scorer import ROLE_TRACKS
+from src.job_profiles import JOB_PROFILES, PROFILE_GROUPS
 
 # Scraped job titles may contain characters the Windows console encoding
 # (e.g. cp932) cannot represent; reconfigure std streams so logging/prints
@@ -56,7 +56,8 @@ async def fetch_and_process():
     try:
         prefs = get_preferences(db)
         logger.info("Starting job fetch...")
-        raw, fetched_sources = await fetch_all_jobs()
+        profiles = prefs.get("job_profiles") or prefs.get("role_tracks") or []
+        raw, fetched_sources = await fetch_all_jobs(profiles=profiles)
         new, updated = save_jobs(db, raw, prefs)
         logger.info("Saved %d new jobs, updated %d existing jobs", new, updated)
         removed_dupes = dedupe_jobs(db)
@@ -83,10 +84,36 @@ scheduler.add_job(fetch_and_process, "interval", minutes=60, id="fetch_jobs", re
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     scheduler.start()
+    _migrate_unhide_tracked_jobs()
     logger.info("Scheduler started. Fetching jobs on startup...")
     await fetch_and_process()
     yield
     scheduler.shutdown()
+
+
+def _migrate_unhide_tracked_jobs() -> None:
+    """One-time migration for the old track-to-hide behavior.
+
+    Jobs that were hidden because they were tracked get unhidden — they are
+    now shown with a status badge (saved) or filtered out via the tracked
+    filter (applied+). Manual hides (no application row) stay hidden.
+    """
+    db = next(get_db())
+    try:
+        tracked_ids = select(Application.job_id)
+        updated = (
+            db.query(Job)
+            .filter(Job.hidden == True, Job.id.in_(tracked_ids))
+            .update({Job.hidden: False}, synchronize_session=False)
+        )
+        if updated:
+            db.commit()
+            logger.info("Migration: unhid %d previously tracked jobs", updated)
+    except Exception as exc:
+        logger.warning("Tracked-job migration failed: %s", exc)
+        db.rollback()
+    finally:
+        db.close()
 
 
 app = FastAPI(title=settings.app_name, lifespan=lifespan)
@@ -110,6 +137,16 @@ def _csv(value: str | None) -> list[str]:
     return [v.strip().lower() for v in value.split(",") if v.strip()]
 
 
+def _sort_order(sort: str) -> list:
+    """ORDER BY clauses for the dashboard sort param."""
+    if sort == "newest":
+        return [Job.date_posted.desc().nullslast(), Job.created_at.desc()]
+    if sort == "company":
+        return [Job.company.asc(), Job.score.desc()]
+    # "match" (default): best score first, newest as tiebreak.
+    return [Job.score.desc(), Job.date_posted.desc().nullslast()]
+
+
 def _jobs_context(
     request: Request,
     db: Session,
@@ -120,6 +157,8 @@ def _jobs_context(
     sources: str = "",
     locations: str = "",
     work: str = "",
+    sort: str = "match",
+    tracked: str = "",
 ):
     """Shared dashboard context with server-side filtering.
 
@@ -131,7 +170,7 @@ def _jobs_context(
     active_locations = _csv(locations)
     active_work = _csv(work)
 
-    query = db.query(Job).filter(Job.hidden == False)
+    query = db.query(Job).options(joinedload(Job.application)).filter(Job.hidden == False)
     if bengaluru_only:
         query = query.filter(
             or_(Job.location.ilike("%bengaluru%"), Job.location.ilike("%bangalore%"))
@@ -165,13 +204,21 @@ def _jobs_context(
         if work_conds:
             query = query.filter(or_(*work_conds))
 
+    # Tracked jobs: "saved" stays visible (with a badge); applied-or-later
+    # is filtered out of the feed unless ?tracked=all.
+    if tracked != "all":
+        query = query.outerjoin(Job.application).filter(
+            or_(Application.id == None, Application.status == "saved")
+        )
+
     total_jobs = query.count()
     new_count = query.filter(Job.is_new == True).count()
     total_pages = max(1, (total_jobs + page_size - 1) // page_size)
     page = max(1, min(page, total_pages))
 
+    order = _sort_order(sort)
     jobs = (
-        query.order_by(Job.score.desc(), Job.date_posted.desc())
+        query.order_by(*order)
         .offset((page - 1) * page_size)
         .limit(page_size)
         .all()
@@ -193,6 +240,8 @@ def _jobs_context(
             "sources": ",".join(active_sources),
             "locations": ",".join(active_locations),
             "work": ",".join(active_work),
+            "sort": sort,
+            "tracked": tracked,
         }
     )
 
@@ -213,7 +262,19 @@ def _jobs_context(
         "active_sources": active_sources,
         "active_locations": active_locations,
         "active_work": active_work,
+        "sort": sort,
+        "tracked": tracked,
         "base_qs": base_qs,
+        "base_qs_nosort": urlencode(
+            {
+                "q": q,
+                "min_score": int(min_score),
+                "sources": ",".join(active_sources),
+                "locations": ",".join(active_locations),
+                "work": ",".join(active_work),
+                "tracked": tracked,
+            }
+        ),
     }
 
 
@@ -252,6 +313,8 @@ def dashboard(
     sources: str = "",
     locations: str = "",
     work: str = "",
+    sort: str = "match",
+    tracked: str = "",
     db: Session = Depends(get_db),
 ):
     # First visit: guide the user through the onboarding questionnaire.
@@ -264,6 +327,7 @@ def dashboard(
         _jobs_context(
             request, db, page=page, q=q, min_score=min_score,
             sources=sources, locations=locations, work=work,
+            sort=sort, tracked=tracked,
         ),
     )
 
@@ -276,6 +340,8 @@ def bengaluru(
     min_score: float = 0.0,
     sources: str = "",
     work: str = "",
+    sort: str = "match",
+    tracked: str = "",
     db: Session = Depends(get_db),
 ):
     return templates.TemplateResponse(
@@ -284,6 +350,7 @@ def bengaluru(
         _jobs_context(
             request, db, page=page, bengaluru_only=True, q=q,
             min_score=min_score, sources=sources, work=work,
+            sort=sort, tracked=tracked,
         ),
     )
 
@@ -312,12 +379,16 @@ def onboarding_page(request: Request, db: Session = Depends(get_db)):
             "request": request,
             "prefs": prefs,
             "settings": settings,
-            "role_tracks": ROLE_TRACKS,
+            "role_tracks": JOB_PROFILES,
+            "profile_groups": PROFILE_GROUPS,
+            "skill_map": {k: v["skill_presets"] for k, v in JOB_PROFILES.items()},
+            "label_map": {k: v["label"] for k, v in JOB_PROFILES.items()},
         },
     )
 
 
 _PROFILE_KEYS = {
+    "job_profiles",
     "role_tracks",
     "experience_level",
     "preferred_tech",
@@ -451,7 +522,8 @@ def create_application(
         )
         db.add(application)
 
-    job.hidden = status != "saved"
+    # Tracking no longer hides the job; the dashboard filters tracked jobs
+    # by status (saved visible with badge, applied+ hidden unless ?tracked=all).
     db.commit()
     return RedirectResponse(url="/applications", status_code=303)
 
@@ -482,7 +554,6 @@ def update_application(
     application.notes = notes
     application.outcome = outcome
 
-    application.job.hidden = status != "saved"
     db.commit()
     return RedirectResponse(url="/applications", status_code=303)
 

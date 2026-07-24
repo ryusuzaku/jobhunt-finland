@@ -54,6 +54,15 @@
         {% if job.is_new %}
         <span class="chip bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300">NEW</span>
         {% endif %}
+        {% if job.application %}
+        {% set st = job.application.status %}
+        {% set st_icon = {"saved": "💾", "applied": "✓", "interview": "🎤", "offer": "🏆", "rejected": "✗", "withdrawn": "↩", "ghosted": "👻"}.get(st, "") %}
+        {% set st_style = {"saved": "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300",
+                           "applied": "bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300",
+                           "interview": "bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400",
+                           "offer": "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400"}.get(st, "bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400") %}
+        <span class="chip {{ st_style }}" title="Tracked in your application tracker">{{ st_icon }} {{ st | capitalize }}</span>
+        {% endif %}
         <span class="chip bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ job.source }}</span>
       </div>
       <h3 class="mt-1.5 text-base font-bold leading-snug text-slate-900 dark:text-white sm:text-lg">
@@ -141,7 +150,7 @@
 </div>
 {% endmacro %}
 
-{% macro filter_panel(action, sources, locations, q, min_score, active_sources, active_locations, active_work) %}
+{% macro filter_panel(action, sources, locations, q, min_score, active_sources, active_locations, active_work, tracked="") %}
 <div x-data="{ open: false }" @keydown.escape.window="open = false">
   <button type="button" @click="open = true"
           class="btn-ghost mb-4 w-full lg:hidden" aria-label="Open filters">
@@ -204,6 +213,14 @@
           </label>
           {% endfor %}
         </div>
+      </div>
+
+      <div>
+        <span class="label">Tracking</span>
+        <label class="flex cursor-pointer items-center gap-2 rounded-lg px-1 py-1 text-sm text-slate-600 dark:text-slate-300">
+          <input type="checkbox" name="tracked" value="all" class="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500" {% if tracked == "all" %}checked{% endif %}>
+          Show applied jobs
+        </label>
       </div>
 
       <details class="group">

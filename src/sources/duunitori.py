@@ -5,6 +5,7 @@ from urllib.parse import urlencode
 import httpx
 
 from src.config import settings
+from src.job_profiles import fi_search_terms
 from src.scorer import extract_salary
 
 logger = logging.getLogger(__name__)
@@ -64,7 +65,8 @@ class DuunitoriSource:
         results: list[dict] = []
         cutoff = datetime.now(timezone.utc) - timedelta(days=settings.duunitori_max_age_days)
 
-        for term in settings.search_terms:
+        # Profile-aware terms; falls back to settings.search_terms when empty.
+        for term in fi_search_terms(getattr(self, "active_profiles", None)):
             page = 1
             while True:
                 if page > settings.duunitori_max_pages_per_term:

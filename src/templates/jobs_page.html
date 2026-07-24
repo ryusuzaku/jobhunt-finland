@@ -21,10 +21,24 @@
 {# ============ Filters + job list ============ #}
 <div class="mt-6 lg:flex lg:items-start lg:gap-6">
   {% block filters %}
-  {{ ui.filter_panel(request.url.path, sources, locations, q, min_score, active_sources, active_locations, active_work) }}
+  {{ ui.filter_panel(request.url.path, sources, locations, q, min_score, active_sources, active_locations, active_work, tracked) }}
   {% endblock %}
 
   <div class="min-w-0 flex-1">
+    {# Sort control #}
+    <div class="mb-4 flex items-center justify-between gap-3">
+      <p class="text-xs font-medium text-slate-400 dark:text-slate-500">
+        {{ total_jobs }} job{% if total_jobs != 1 %}s{% endif %}
+      </p>
+      <div class="flex items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 dark:border-slate-700 dark:bg-slate-900" role="group" aria-label="Sort jobs">
+        {% for key, label in [("match", "✨ Match"), ("newest", "🕐 Newest"), ("company", "🔤 Company")] %}
+        <a href="?{{ base_qs_nosort }}&sort={{ key }}"
+           class="rounded-lg px-3 py-1.5 text-xs font-semibold transition {% if sort == key %}bg-brand-600 text-white shadow-sm{% else %}text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white{% endif %}"
+           {% if sort == key %}aria-current="true"{% endif %}>{{ label }}</a>
+        {% endfor %}
+      </div>
+    </div>
+
     {% if jobs %}
     <div id="job-list" class="space-y-4">
       {% for job in jobs %}

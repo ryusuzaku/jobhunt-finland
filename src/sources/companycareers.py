@@ -26,7 +26,7 @@ from src.config import settings
 from src.scorer import extract_salary
 from src.sources.india_common import (
     is_junior_friendly,
-    is_tech_role,
+    keep_role,
     strip_html,
 )
 
@@ -150,7 +150,8 @@ class CompanyCareersSource:
             return False
         if not _is_allowed_location(location):
             return False
-        if not is_tech_role(title, description):
+        # Profile-aware: IT employers also post marketing/finance/design roles.
+        if not keep_role(title, description, getattr(self, "active_profiles", None)):
             return False
         if not is_junior_friendly(title):
             return False

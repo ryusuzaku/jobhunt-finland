@@ -12,7 +12,8 @@ DEFAULT_PREFERENCES = {
     "hybrid_ok": settings.default_hybrid_ok,
     "alert_threshold": settings.alert_threshold,
     # Onboarding profile (empty/absent = current behaviour, no personalization)
-    "role_tracks": [],                # e.g. ["software", "data"]
+    "job_profiles": [],               # e.g. ["software", "marketing"] (superset of role_tracks)
+    "role_tracks": [],                # legacy key; superseded by job_profiles
     "experience_level": "junior",     # student | graduate | junior | mid
     "onboarding_completed": False,
     "profile_updated_at": "",         # ISO timestamp, used for local-first sync

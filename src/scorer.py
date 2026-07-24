@@ -1,5 +1,9 @@
 import re
 from src.config import settings
+from src.job_profiles import JOB_PROFILES, keyword_pattern
+
+# Backward-compatible alias (was defined here before job_profiles.py).
+ROLE_TRACKS = JOB_PROFILES
 
 # Signals that suggest strong learning/growth opportunity for juniors
 LEARNING_POSITIVE = [
@@ -33,61 +37,6 @@ GOOD_PERKS = [
     "paternity", "health", "insurance", "wellbeing", "lunch", "sport", "gym",
     "pension", "bonus", "equity", "stock", "learning", "conference",
 ]
-
-# Onboarding role tracks -> keywords that indicate a job belongs to the track.
-# Used for a small additive bonus so picking tracks never lowers existing scores.
-ROLE_TRACKS = {
-    "software": {
-        "label": "Software / Backend",
-        "icon": "💻",
-        "keywords": ["software", "backend", "back-end", "full stack", "full-stack",
-                      "fullstack", "api developer", "server", "embedded"],
-    },
-    "frontend": {
-        "label": "Frontend / Web",
-        "icon": "🎨",
-        "keywords": ["frontend", "front-end", "web developer", "web development",
-                      "react", "vue", "angular", "typescript", "javascript", "css"],
-    },
-    "data": {
-        "label": "Data / AI / ML",
-        "icon": "🤖",
-        "keywords": ["data engineer", "data scientist", "machine learning", "ml engineer",
-                      "ai engineer", "analytics", "etl", "data analyst", "data platform",
-                      "deep learning", "nlp", "data"],
-    },
-    "devops": {
-        "label": "DevOps / Cloud",
-        "icon": "☁️",
-        "keywords": ["devops", "cloud", "infrastructure", "kubernetes", "docker",
-                      "aws", "azure", "gcp", "sre", "platform engineer", "ci/cd",
-                      "terraform"],
-    },
-    "mobile": {
-        "label": "Mobile",
-        "icon": "📱",
-        "keywords": ["android", "ios", "mobile", "kotlin", "swift", "flutter",
-                      "react native"],
-    },
-    "qa": {
-        "label": "QA / Testing",
-        "icon": "🧪",
-        "keywords": ["qa", "test engineer", "testing", "quality assurance",
-                      "test automation", "sdet"],
-    },
-    "design": {
-        "label": "Design / UX",
-        "icon": "✏️",
-        "keywords": ["designer", "ux", "ui design", "product design", "figma",
-                      "user experience"],
-    },
-    "security": {
-        "label": "Security",
-        "icon": "🔒",
-        "keywords": ["security", "infosec", "cybersecurity", "cyber security",
-                      "pentest", "secops", "soc analyst"],
-    },
-}
 
 # How strongly each experience level penalizes senior-looking roles.
 EXPERIENCE_PENALTY_FACTOR = {
@@ -330,24 +279,24 @@ def score_job(
     penalty_factor = EXPERIENCE_PENALTY_FACTOR.get(level, 1.0)
     penalty = min(60, senior_matches * 15 * penalty_factor)
 
-    # Role-track bonus (additive; only when the user picked tracks, so
-    # default behaviour is unchanged). Title matches count double.
+    # Profile/track bonus (additive; only when the user picked profiles,
+    # so default behaviour is unchanged). Title matches count double.
     track_bonus = 0
-    chosen_tracks = prefs.get("role_tracks") or []
+    chosen_tracks = prefs.get("job_profiles") or prefs.get("role_tracks") or []
     if chosen_tracks:
         title_norm = _normalize(title)
         track_hits = 0
         for track in chosen_tracks:
-            info = ROLE_TRACKS.get(track)
+            info = JOB_PROFILES.get(track)
             if not info:
                 continue
-            for kw in info["keywords"]:
-                pattern = r"\b" + re.escape(kw.lower()) + r"\b"
+            for kw in info["title_keywords"]:
+                pattern = keyword_pattern(kw)
                 if re.search(pattern, norm_text):
                     track_hits += 1
                     if re.search(pattern, title_norm):
                         track_hits += 1  # title match counts double
-                    break  # one hit per track is enough
+                    break  # one hit per profile is enough
         track_bonus = min(15, track_hits * 6)
 
     # Weighted final score

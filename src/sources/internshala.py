@@ -7,11 +7,12 @@ from bs4 import BeautifulSoup
 
 from src.config import settings
 from src.scorer import extract_salary
+from src.job_profiles import in_search_terms
 from src.sources.india_common import (
     is_agency_spam,
     is_bengaluru_location,
     is_junior_friendly,
-    is_tech_role,
+    keep_role,
     parse_relative_date,
 )
 
@@ -27,7 +28,7 @@ class InternshalaSource:
 
     def __init__(self):
         self.base_url = "https://internshala.com"
-        self.search_terms = settings.indian_search_terms
+        self.search_terms = settings.indian_search_terms  # default; profile-aware at fetch
         self.max_pages_per_term = 1
         self.headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -44,7 +45,7 @@ class InternshalaSource:
         results: list[dict] = []
         seen_ids: set[str] = set()
 
-        for term in self.search_terms:
+        for term in in_search_terms(getattr(self, "active_profiles", None)):
             for page in range(1, self.max_pages_per_term + 1):
                 url = f"{self.base_url}/jobs/{self._slug(term)}-jobs/"
                 if page > 1:
@@ -124,7 +125,7 @@ class InternshalaSource:
             return None
         if is_agency_spam(company, title):
             return None
-        if not is_tech_role(title, " ".join(skills) or description):
+        if not keep_role(title, " ".join(skills) or description, getattr(self, "active_profiles", None)):
             return None
         if not is_junior_friendly(title, experience):
             return None

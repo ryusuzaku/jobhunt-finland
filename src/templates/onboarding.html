@@ -6,7 +6,7 @@
 <div class="mx-auto mt-6 max-w-2xl"
      x-data="{
        step: 1,
-       tracks: {{ (prefs.role_tracks or []) | tojson }},
+       tracks: {{ (prefs.job_profiles or prefs.role_tracks or []) | tojson }},
        level: {{ (prefs.experience_level or 'junior') | tojson }},
        techs: {{ (prefs.preferred_tech or []) | tojson }},
        techSearch: '',
@@ -15,10 +15,17 @@
        hybridOk: {{ 'true' if prefs.hybrid_ok else 'false' }},
        threshold: {{ (prefs.alert_threshold or 60) | int }},
        saving: false,
-       presets: ['python','javascript','typescript','react','node.js','java','c#','c++','go','rust','php','ruby','swift','kotlin','sql','postgresql','mysql','mongodb','redis','docker','kubernetes','aws','azure','gcp','terraform','linux','git','html','css','vue','angular','django','flask','fastapi','spring','.net','graphql','tensorflow','pytorch','pandas'],
+       skillMap: {{ skill_map | tojson }},
+       labelMap: {{ label_map | tojson }},
+       defaultPresets: ['python','javascript','typescript','react','node.js','java','c#','c++','go','rust','php','ruby','swift','kotlin','sql','postgresql','mysql','mongodb','redis','docker','kubernetes','aws','azure','gcp','terraform','linux','git','html','css','vue','angular','django','flask','fastapi','spring','.net','graphql','tensorflow','pytorch','pandas'],
        get filteredPresets() {
+         let pool = [...this.defaultPresets];
+         for (const t of this.tracks) {
+           if (this.skillMap[t]) pool.push(...this.skillMap[t]);
+         }
+         pool = [...new Set(pool)];
          const q = this.techSearch.toLowerCase().trim();
-         return this.presets.filter(t => !this.techs.includes(t) && (!q || t.includes(q))).slice(0, 12);
+         return pool.filter(t => !this.techs.includes(t) && (!q || t.includes(q))).slice(0, 14);
        },
        toggleTrack(t) {
          this.tracks.includes(t) ? this.tracks = this.tracks.filter(x => x !== t) : this.tracks.push(t);
@@ -36,7 +43,7 @@
          if (this.saving) return;
          this.saving = true;
          const profile = skipped ? { onboarding_completed: true } : {
-           role_tracks: this.tracks,
+           job_profiles: this.tracks,
            experience_level: this.level,
            preferred_tech: this.techs,
            preferred_locations: this.locations,
@@ -81,12 +88,14 @@
 
   <div class="card p-5 sm:p-7">
 
-    {# ===== Step 1: role tracks ===== #}
+    {# ===== Step 1: job profiles ===== #}
     <section x-show="step === 1">
-      <h2 class="text-lg font-bold text-slate-900 dark:text-white">What kind of roles are you after?</h2>
-      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Pick any that apply — matching jobs get a ranking boost.</p>
-      <div class="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-2">
-        {% for key, track in role_tracks.items() %}
+      <h2 class="text-lg font-bold text-slate-900 dark:text-white">What kind of work are you after?</h2>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Pick any fields that interest you — the job feed and rankings adapt. Matching jobs get a boost.</p>
+      {% for group in profile_groups %}
+      <p class="mt-5 text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{{ group }}</p>
+      <div class="mt-2 grid grid-cols-2 gap-2.5">
+        {% for key, track in role_tracks.items() if track.group == group %}
         <button type="button" @click="toggleTrack('{{ key }}')"
                 :class="tracks.includes('{{ key }}') ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/50' : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600'"
                 class="flex items-center gap-2.5 rounded-xl border-2 p-3.5 text-left transition">
@@ -95,6 +104,7 @@
         </button>
         {% endfor %}
       </div>
+      {% endfor %}
     </section>
 
     {# ===== Step 2: experience level ===== #}
@@ -123,8 +133,8 @@
 
     {# ===== Step 3: tech stack ===== #}
     <section x-show="step === 3" x-cloak>
-      <h2 class="text-lg font-bold text-slate-900 dark:text-white">Your tech stack</h2>
-      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Jobs mentioning these score higher on tech match.</p>
+      <h2 class="text-lg font-bold text-slate-900 dark:text-white">Your skills</h2>
+      <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Jobs mentioning these score higher on skill match. Suggestions follow your selected fields.</p>
 
       <div class="mt-4" x-show="techs.length">
         <div class="flex flex-wrap gap-1.5">
@@ -191,7 +201,7 @@
       <div class="mt-5 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800/60">
         <p class="font-bold text-slate-800 dark:text-slate-200">Your setup</p>
         <ul class="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
-          <li>🎯 <span x-text="tracks.length ? tracks.join(', ') : 'all role types'"></span></li>
+          <li>🎯 <span x-text="tracks.length ? tracks.map(t => labelMap[t] || t).join(', ') : 'all fields'"></span></li>
           <li>📈 <span x-text="level"></span></li>
           <li>🛠️ <span x-text="techs.length ? techs.slice(0, 6).join(', ') + (techs.length > 6 ? '…' : '') : 'any stack'"></span></li>
           <li>📍 <span x-text="locations.length ? locations.join(', ') : 'anywhere'"></span>

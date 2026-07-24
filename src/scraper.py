@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from src.cache import CachedAsyncClient, JobSnapshotCache
 from src.config import settings
+from src.job_profiles import keep_job, selected_profiles
 from src.models import Job
 from src.scorer import score_job
 from src.sources import (
@@ -49,17 +50,24 @@ SOURCES = [
 snapshot_cache = JobSnapshotCache()
 
 
-async def fetch_all_jobs() -> tuple[list[dict], dict[str, set[str]]]:
+async def fetch_all_jobs(profiles: list[str] | None = None) -> tuple[list[dict], dict[str, set[str]]]:
     """Fetch raw job postings from all configured sources.
 
     Uses a cached HTTP client to avoid hammering sources on every refresh, and
     falls back to the previous snapshot if a source fails or returns empty.
+
+    Args:
+        profiles: selected job-profile keys (see src/job_profiles.py). Sources
+            read them via ``source.active_profiles`` to adapt their search
+            terms and keep-filters; a central keep-filter is also applied
+            after normalization. Empty/None -> legacy tech-only behavior.
 
     Returns:
         - List of normalized job dicts from all sources.
         - Dict mapping source name -> set of fetched source_ids, used later to
           prune stale DB rows for sources that succeeded this run.
     """
+    active = selected_profiles(profiles)
     limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
     fetched_sources: dict[str, set[str]] = {}
     async with CachedAsyncClient(
@@ -71,6 +79,7 @@ async def fetch_all_jobs() -> tuple[list[dict], dict[str, set[str]]]:
         all_raw: list[dict] = []
         for source in SOURCES:
             source_name = source.name
+            source.active_profiles = active
             previous = snapshot_cache.get(source_name)
             source_ids: set[str] = set()
             try:
@@ -79,7 +88,7 @@ async def fetch_all_jobs() -> tuple[list[dict], dict[str, set[str]]]:
                 for item in raw:
                     try:
                         norm = source.normalize(item)
-                        if norm:
+                        if norm and (not active or keep_job(norm.get("title"), norm.get("description"), active)):
                             normalized.append(norm)
                     except Exception as exc:
                         logger.warning("Normalization error for %s: %s", source_name, exc)

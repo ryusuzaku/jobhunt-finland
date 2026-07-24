@@ -7,5 +7,5 @@
 {% block hero_subtitle %}Junior & fresher tech roles in Bengaluru/Bangalore — consultancy spam filtered out, direct employers ranked first.{% endblock %}
 
 {% block filters %}
-{{ ui.filter_panel(request.url.path, sources, [], q, min_score, active_sources, [], active_work) }}
+{{ ui.filter_panel(request.url.path, sources, [], q, min_score, active_sources, [], active_work, tracked) }}
 {% endblock %}

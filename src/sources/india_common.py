@@ -56,6 +56,23 @@ AGENCY_SPAM_KEYWORDS = [
 ]
 
 
+from src.job_profiles import keep_job, selected_profiles
+
+_TECH_GROUP_NOTE = "Tech roles only (default); profile-aware when profiles are selected."
+
+
+def keep_role(title: str, extra_text: str = "", profiles: list[str] | None = None) -> bool:
+    """Profile-aware replacement for is_tech_role.
+
+    When job profiles are selected, keep_job decides and the NON_TECH
+    drop-list no longer applies (the user explicitly asked for e.g.
+    marketing jobs). With no selection, legacy tech-only behavior.
+    """
+    if selected_profiles(profiles):
+        return keep_job(title, extra_text, profiles)
+    return is_tech_role(title, extra_text)
+
+
 def is_agency_spam(company: str, title: str = "") -> bool:
     low = f"{company} {title}".lower()
     return any(kw in low for kw in AGENCY_SPAM_KEYWORDS)

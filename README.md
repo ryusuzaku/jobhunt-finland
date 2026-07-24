@@ -4,7 +4,8 @@ A self-hosted, installable (PWA) job-hunting app that aggregates junior-level te
 
 ## What it does
 
-- **Onboards you in 5 questions** — role tracks, experience level, tech stack, locations, and work setup — then ranks every job for *you*. No config files to edit.
+- **Onboards you in 5 questions** — job fields (tech, marketing, sales, finance, healthcare, engineering, education, logistics, hospitality…), experience level, skills, locations, and work setup — then ranks every job for *you*. No config files to edit.
+- **Not just IT**: 19 selectable job profiles with curated keyword packs (English + Finnish) drive which jobs are fetched, kept, and boosted — anyone can hunt any kind of job.
 - Fetches jobs automatically every hour from 14 sources, including Indian boards (Bengaluru) and Finnish IT companies' own career pages.
 - De-duplicates the same role posted on multiple boards, keeping the best link (company career page preferred over aggregators).
 - Filters out Indian staffing-agency reposts ("Hiring For ...", "Manpower", "Placements", "Walk-in") so only direct-employer listings remain.
@@ -15,7 +16,8 @@ A self-hosted, installable (PWA) job-hunting app that aggregates junior-level te
   2. **Work-life / location fit** (remote/hybrid, flexible hours, preferred cities)
   3. **Tech-stack match** (your preferred technologies)
   4. **Company quality** (startup size, perks, established-but-growing)
-- Shows everything in a clean web dashboard with search, score filters, source filters, and a dynamic location filter.
+- Shows everything in a clean web dashboard with search, score filters, source filters, a dynamic location filter, and **sorting by match, date, or company**.
+- **Application tracking that stays visible**: tracked jobs keep a status badge (💾 Saved / ✓ Applied / 🎤 Interview / 🏆 Offer); applied-or-later jobs leave the feed automatically (toggle “Show applied” to see them).
 - Sends alerts for new high-scoring jobs via console, email, Discord, or Slack.
 
 ## Data sources

@@ -8,6 +8,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from src.config import settings
+from src.job_profiles import keep_job
 from src.scorer import extract_salary
 
 logger = logging.getLogger(__name__)
@@ -43,7 +44,7 @@ class AcademicWorkSource:
             for url in links:
                 try:
                     detail = await self._fetch_detail(client, url)
-                    if detail and self._is_tech_role(detail["title"]):
+                    if detail and self._keep(detail):
                         results.append(detail)
                 except Exception as exc:
                     logger.warning("Academic Work detail fetch failed for %s: %s", url, exc)
@@ -66,6 +67,16 @@ class AcademicWorkSource:
     def _is_tech_role(self, title: str) -> bool:
         low = title.lower()
         return any(kw in low for kw in TECH_KEYWORDS)
+
+    def _keep(self, detail: dict) -> bool:
+        """Profile-aware keep-filter (limits detail-page relevance).
+
+        Falls back to the legacy tech filter when no profiles are selected.
+        """
+        profiles = getattr(self, "active_profiles", None)
+        if profiles:
+            return keep_job(detail.get("title"), detail.get("description"), profiles)
+        return self._is_tech_role(detail["title"])
 
     async def _fetch_detail(self, client: httpx.AsyncClient, url: str) -> dict | None:
         resp = await client.get(url, headers={"User-Agent": settings.user_agent})

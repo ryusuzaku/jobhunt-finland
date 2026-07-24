@@ -8,6 +8,7 @@ import httpx
 from bs4 import BeautifulSoup
 
 from src.config import settings
+from src.job_profiles import en_search_terms, keep_job
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +32,9 @@ class JoblySource:
     async def fetch(self, client: httpx.AsyncClient) -> list[dict]:
         results: list[dict] = []
         seen = set()
-        for term in self.search_terms:
+        profiles = getattr(self, "active_profiles", None)
+        terms = en_search_terms(profiles) or self.search_terms
+        for term in terms:
             for page in range(2):  # 2 pages × 20 = 40 results per term
                 url = f"{self.base_url}/en/jobs?search={term}&page={page}"
                 try:
@@ -47,7 +50,10 @@ class JoblySource:
                         if parsed["url"] in seen:
                             continue
                         seen.add(parsed["url"])
-                        if self._is_tech_role(parsed["title"]):
+                        if profiles:
+                            if keep_job(parsed["title"], "", profiles):
+                                results.append(parsed)
+                        elif self._is_tech_role(parsed["title"]):
                             results.append(parsed)
                 except Exception as exc:
                     logger.warning("Jobly search failed for %s page %d: %s", term, page, exc)
