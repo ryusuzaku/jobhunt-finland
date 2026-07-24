@@ -35,6 +35,8 @@ The project is a working, self-hosted FastAPI dashboard that aggregates and rank
 - ✅ Job profiles beyond IT: 19 selectable profiles in 6 groups (Tech, Design, Business, Engineering, Care & Education, Service) with curated English + Finnish keyword packs; fetching, filtering, search terms, and scoring all adapt to the selection. Empty selection = legacy tech-only behavior.
 - ✅ Sort control: order the feed by match score, date published, or company — preserved across pagination and shareable URLs.
 - ✅ Tracking visibility: tracked jobs show a status badge on the dashboard; applied-or-later jobs are filtered out of the feed by default (`?tracked=all` to see them); the old silent track-to-hide behavior is migrated automatically.
+- ✅ Within-source dedupe: re-listings of the same opening (same source + title + company + location, order-insensitive) are collapsed; genuine multi-city postings are kept; tracked jobs are never deleted.
+- ✅ Country-wide listings (location "Finland", e.g. from Jobly) now reach the dashboard via the `finland` allowed-location token.
 
 ## Recently completed
 

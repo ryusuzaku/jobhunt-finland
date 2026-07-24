@@ -85,6 +85,9 @@ class Settings(BaseSettings):
     allowed_dashboard_locations: list[str] = [
         "helsinki", "espoo", "vantaa", "tampere", "turku", "lahti",
         "bengaluru", "bangalore",
+        # Some sources (e.g. Jobly) only say "Finland" for country-wide
+        # listings; without this token those jobs never reach the feed.
+        "finland",
     ]
     default_remote_ok: bool = True
     default_hybrid_ok: bool = True

@@ -245,23 +245,34 @@ def _norm_company(company: str) -> str:
     return _COMPANY_SUFFIXES.sub("", _norm_text(company)).strip()
 
 
-def dedupe_jobs(db: Session) -> int:
-    """Delete cross-source duplicates of the same role at the same company.
+def _norm_location(location: str) -> str:
+    """Normalize a location for duplicate detection.
 
-    Jobs are grouped by normalized (title, company). Several rows from the
-    SAME source are treated as distinct openings (e.g. one title posted for
-    multiple offices) and are kept. When the same role appears in MULTIPLE
-    sources, only the best row survives: tracked application > direct-
-    employer source > newest posting > highest score.
+    Multi-location strings (some sources list every office in one field)
+    are split on commas, normalized per token, and sorted, so the same
+    office set listed in a different order still counts as a duplicate.
+    """
+    tokens = [_norm_text(t) for t in (location or "").split(",")]
+    return ",".join(sorted(t for t in tokens if t))
+
+
+def dedupe_jobs(db: Session) -> int:
+    """Delete duplicate postings of the same role at the same company.
+
+    Pass 1 (within-source): rows from the SAME source with the same
+    normalized (title, company, location) are re-listings of one opening
+    (e.g. a board re-publishing under new URLs); only the best survives.
+    Different locations are distinct openings (multi-city postings) and
+    are kept.
+
+    Pass 2 (cross-source): rows grouped by normalized (title, company).
+    When the same role appears in MULTIPLE sources, only the best row
+    survives: tracked application > direct-employer source > newest
+    posting > highest score.
+
+    A job with a tracked application is never deleted.
     """
     jobs = db.query(Job).filter(Job.hidden == False).all()
-    groups: dict[tuple[str, str], list[Job]] = {}
-    for job in jobs:
-        title_key = _norm_text(job.title or "")
-        company_key = _norm_company(job.company or "")
-        if not title_key or not company_key:
-            continue
-        groups.setdefault((title_key, company_key), []).append(job)
 
     _EPOCH = datetime(1970, 1, 1)
 
@@ -280,13 +291,54 @@ def dedupe_jobs(db: Session) -> int:
         priority = _SOURCE_PRIORITY.get(j.source, 9)
         return (has_app, priority, -_posted_ts(j), -(j.score or 0))
 
-    removed = 0
-    for group in groups.values():
-        if len(group) < 2:
-            continue
+    def _delete_dupes(group: list[Job], keep: Job) -> int:
+        """Delete every row in group except keep; returns rows removed.
 
-        # Keep the best row per source; within-source duplicates are
-        # considered distinct openings and are left alone.
+        Rows with a tracked application are spared even when they are
+        duplicates — the tracker must never lose a job."""
+        n = 0
+        for dup in group:
+            if dup is keep or dup.application:
+                continue
+            logger.info(
+                "Dedup: removing '%s' at %s (%s), keeping %s",
+                dup.title, dup.company, dup.source, keep.source,
+            )
+            db.delete(dup)
+            n += 1
+        return n
+
+    removed = 0
+
+    # --- Pass 1: within-source re-listings (same title+company+location)
+    within: dict[tuple[str, str, str, str], list[Job]] = {}
+    for job in jobs:
+        title_key = _norm_text(job.title or "")
+        company_key = _norm_company(job.company or "")
+        if not title_key or not company_key:
+            continue
+        key = (job.source, title_key, company_key, _norm_location(job.location or ""))
+        within.setdefault(key, []).append(job)
+
+    survivors: list[Job] = []
+    for group in within.values():
+        group.sort(key=_rank)
+        keeper = group[0]
+        keeper.is_new = any(j.is_new for j in group)
+        removed += _delete_dupes(group, keeper)
+        survivors.extend(j for j in group if j is keeper or j.application)
+
+    # --- Pass 2: cross-source duplicates among the survivors
+    groups: dict[tuple[str, str], list[Job]] = {}
+    for job in survivors:
+        title_key = _norm_text(job.title or "")
+        company_key = _norm_company(job.company or "")
+        groups.setdefault((title_key, company_key), []).append(job)
+
+    for group in groups.values():
+        # Keep the best row per source (pass 1 already collapsed
+        # within-source re-listings); identical openings in different
+        # cities are distinct and left alone.
         best_per_source: dict[str, Job] = {}
         for job in group:
             current = best_per_source.get(job.source)
@@ -299,13 +351,7 @@ def dedupe_jobs(db: Session) -> int:
         candidates.sort(key=_rank)
         keeper = candidates[0]
         keeper.is_new = any(j.is_new for j in group)
-        for dup in candidates[1:]:
-            logger.info(
-                "Dedup: removing '%s' at %s (%s), keeping %s",
-                dup.title, dup.company, dup.source, keeper.source,
-            )
-            db.delete(dup)
-            removed += 1
+        removed += _delete_dupes(candidates, keeper)
 
     if removed:
         db.commit()

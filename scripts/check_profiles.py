@@ -1,5 +1,10 @@
 # Unit-style checks for job profiles + scorer personalization (UTF-8 file to
 # avoid PowerShell argv encoding mangling Finnish characters).
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 from src.job_profiles import (
     JOB_PROFILES,
     fi_search_terms,
