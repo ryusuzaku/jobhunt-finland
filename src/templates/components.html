@@ -46,6 +46,7 @@
 
 {% macro job_card(job, index=0) %}
 <article id="job-{{ job.id }}"
+  aria-labelledby="job-title-{{ job.id }}"
   class="card job-card animate-fade-up p-4 sm:p-5 {% if job.is_new %}border-l-4 border-l-brand-500{% endif %}"
   style="animation-delay: {{ [index * 30, 300] | min }}ms">
   <div class="flex items-start gap-3 sm:gap-4">
@@ -65,7 +66,7 @@
         {% endif %}
         <span class="chip bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">{{ job.source }}</span>
       </div>
-      <h3 class="mt-1.5 text-base font-bold leading-snug text-slate-900 dark:text-white sm:text-lg">
+      <h3 id="job-title-{{ job.id }}" class="mt-1.5 text-base font-bold leading-snug text-slate-900 dark:text-white sm:text-lg">
         <a href="{{ job.url }}" target="_blank" rel="noopener" class="hover:text-brand-600 dark:hover:text-brand-400">{{ job.title }}</a>
       </h3>
       <p class="mt-0.5 truncate text-sm font-medium text-slate-600 dark:text-slate-300">{{ job.company }}</p>
@@ -129,14 +130,14 @@
     <form x-show="trackOpen" x-cloak method="post" action="/applications"
           class="mt-1 grid w-full grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60 sm:grid-cols-5">
       <input type="hidden" name="job_id" value="{{ job.id }}">
-      <select name="status" class="input col-span-2 sm:col-span-1">
-        <option value="saved" selected>Saved</option>
-        <option value="applied">Applied</option>
-        <option value="interview">Interview</option>
+      <select name="status" aria-label="Application status" class="input col-span-2 sm:col-span-1">
+        {% for status in ['saved', 'applied', 'interview', 'offer', 'rejected', 'withdrawn', 'ghosted'] %}
+        <option value="{{ status }}" {% if status == (job.application.status if job.application else 'saved') %}selected{% endif %}>{{ status | capitalize }}</option>
+        {% endfor %}
       </select>
-      <input type="date" name="applied_at" class="input" title="Applied date">
-      <input type="date" name="closing_date" class="input" title="Closing date">
-      <input type="text" name="notes" placeholder="Notes…" class="input col-span-2 sm:col-span-1">
+      <input type="date" name="applied_at" class="input" aria-label="Applied date" value="{{ job.application.applied_at.strftime('%Y-%m-%d') if job.application and job.application.applied_at else '' }}">
+      <input type="date" name="closing_date" class="input" aria-label="Closing date" value="{{ job.application.closing_date.strftime('%Y-%m-%d') if job.application and job.application.closing_date else '' }}">
+      <input type="text" name="notes" aria-label="Application notes" placeholder="Notes…" value="{{ job.application.notes or '' if job.application else '' }}" class="input col-span-2 sm:col-span-1">
       <button type="submit" class="btn-primary col-span-2 sm:col-span-1">Save</button>
     </form>
   </div>
@@ -151,7 +152,7 @@
 {% endmacro %}
 
 {% macro filter_panel(action, sources, locations, q, min_score, active_sources, active_locations, active_work, tracked="") %}
-<div x-data="{ open: false }" @keydown.escape.window="open = false">
+<div x-data="{ open: false, desktop: window.innerWidth >= 1024 }" @resize.window="desktop = window.innerWidth >= 1024" @keydown.escape.window="open = false">
   <button type="button" @click="open = true"
           class="btn-ghost mb-4 w-full lg:hidden" aria-label="Open filters">
     <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"/></svg>
@@ -165,6 +166,7 @@
        class="fixed inset-0 z-40 bg-slate-900/50 backdrop-blur-sm lg:hidden"></div>
 
   <aside :class="open ? 'translate-x-0' : '-translate-x-full'"
+         :inert="!open && !desktop" :aria-hidden="!open && !desktop"
          class="fixed inset-y-0 left-0 z-50 w-80 max-w-[85vw] transform overflow-y-auto bg-white p-5 shadow-lift transition-transform duration-300 lg:static lg:z-auto lg:w-72 lg:translate-x-0 lg:transform-none lg:overflow-visible lg:bg-transparent lg:p-0 lg:shadow-none dark:bg-slate-900 lg:dark:bg-transparent">
     <div class="mb-4 flex items-center justify-between lg:hidden">
       <h2 class="text-lg font-bold text-slate-900 dark:text-white">Filters</h2>
@@ -172,6 +174,7 @@
     </div>
 
     <form method="get" action="{{ action }}" class="card space-y-5 p-4 lg:sticky lg:top-20">
+      <input type="hidden" name="sort" value="{{ sort or 'match' }}">
       <div>
         <label for="f-q" class="label">Search</label>
         <input id="f-q" type="search" name="q" value="{{ q }}" placeholder="Title, company, keyword…" class="input">

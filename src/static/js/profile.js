@@ -26,8 +26,13 @@
   }
 
   function newerThan(a, b) {
-    // ISO strings compare lexicographically; missing = oldest.
-    return (a || "") > (b || "");
+    function timestamp(value) {
+      if (!value) return 0;
+      // Older saves used naive timestamps. Treat them as UTC consistently.
+      if (!/(Z|[+-]\d\d:\d\d)$/.test(value)) value += "Z";
+      return Date.parse(value) || 0;
+    }
+    return timestamp(a) > timestamp(b);
   }
 
   function sync() {
@@ -45,7 +50,9 @@
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(local),
-          }).catch(function () {});
+          }).then(function (r) { return r.ok ? r.json() : null; })
+            .then(function (data) { if (data && data.ok) writeLocal(data.profile); })
+            .catch(function () {});
         }
       })
       .catch(function () {
@@ -55,6 +62,7 @@
 
   window.JHProfile = {
     get: readLocal,
+    remember: writeLocal,
     set: function (profile) {
       writeLocal(profile);
       return fetch("/api/profile", {

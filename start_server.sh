@@ -2,8 +2,10 @@
 # Start the JobHunt Finland FastAPI server as a background process on macOS/Linux.
 # Logs are written to logs/uvicorn.log and logs/uvicorn.err.log.
 
+set -e
 PORT=8006
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+cd "$ROOT"
 
 # Run one-time setup if the virtual environment is missing.
 if [ ! -d "$ROOT/.venv" ]; then
@@ -22,8 +24,8 @@ echo "Starting uvicorn on port $PORT..."
 nohup "$ROOT/.venv/bin/python" -m uvicorn src.main:app --host 127.0.0.1 --port "$PORT" \
     > "$ROOT/logs/uvicorn.log" 2> "$ROOT/logs/uvicorn.err.log" &
 
-# Uvicorn binds the port after the lifespan startup fetch completes, which can take ~30-60s.
-echo "Waiting for the first fetch to finish and the port to come up..."
+# Sources refresh in the background; the dashboard should be available immediately.
+echo "Waiting for the dashboard port to come up..."
 TIMEOUT=120
 ELAPSED=0
 while [ $ELAPSED -lt $TIMEOUT ]; do

@@ -1,4 +1,12 @@
-# ⚡ JobHunt
+# JobHunt
+
+## Hosted phone-first version
+
+The managed PWA uses `src.hosted.app:app`, a redesigned interface, six-step resumable onboarding, per-user online storage, and dedicated Discover, Saved, Tracker and Profile screens. Its tested source is saved privately in Manus version history; real account sign-in, approved HTTPS publication and production scheduling remain release gates. Open the managed Preview for this version.
+
+See [hosted setup and release notes](docs/HOSTED.md) and the [current checklist](TODO.md). The original SQLite data is not imported automatically. The local startup scripts below remain the preserved fallback, not the new managed Preview.
+
+## Original local fallback
 
 A self-hosted, installable (PWA) job-hunting app that aggregates junior-level tech positions in Finland & Bengaluru (plus selected global remote roles) and ranks them by what actually matters for early-career developers.
 
@@ -6,7 +14,7 @@ A self-hosted, installable (PWA) job-hunting app that aggregates junior-level te
 
 - **Onboards you in 5 questions** — job fields (tech, marketing, sales, finance, healthcare, engineering, education, logistics, hospitality…), experience level, skills, locations, and work setup — then ranks every job for *you*. No config files to edit.
 - **Not just IT**: 19 selectable job profiles with curated keyword packs (English + Finnish) drive which jobs are fetched, kept, and boosted — anyone can hunt any kind of job.
-- Fetches jobs automatically every hour from 14 sources, including Indian boards (Bengaluru) and Finnish IT companies' own career pages.
+- Refreshes hourly using 14 registered adapters, including Bengaluru boards and Finnish employer career pages. LinkedIn is disabled by default; individual sources can be unavailable and are reported under **Source health**.
 - De-duplicates the same role posted on multiple boards, keeping the best link (company career page preferred over aggregators).
 - Filters out Indian staffing-agency reposts ("Hiring For ...", "Manpower", "Placements", "Walk-in") so only direct-employer listings remain.
 - **Installs on your phone** like a native app (PWA): home-screen icon, offline reading of previously loaded pages, dark mode.
@@ -25,16 +33,16 @@ A self-hosted, installable (PWA) job-hunting app that aggregates junior-level te
 | Source | Method | Notes |
 |--------|--------|-------|
 | **Duunitori** | JSON API | Largest Finnish job board |
-| **The Hub** | JSON API | Nordic startup jobs with company metadata, perks, salary ranges |
+| **The Hub** | Public HTML listings | Finnish startup listings with bounded pagination; its old JSON API was removed. Listing summaries may lack salary/perks metadata. |
 | **EnglishJobs.fi** | HTML scrape | English-speaking roles in Finland |
 | **Jobly** | HTML scrape | Finnish listings (Monster backend) |
 | **Academic Work** | HTML scrape | Trainee/junior-focused roles |
-| **LinkedIn** | HTML scrape | Public job search cards (respects cooldowns, falls back on failure) |
+| **LinkedIn** | Optional adapter | Disabled by default (`ENABLE_LINKEDIN=false`); enable only with permitted access. |
 | **RemoteOK** | JSON API | Global remote tech roles; filtered to Finland/Europe/global |
 | **Remotive** | JSON API | Remote software/data/devops roles; location-filtered |
 | **Working Nomads** | JSON API | Remote tech jobs; tech-role filter |
 | **We Work Remotely** | RSS parse | Remote tech jobs |
-| **Shine** | HTML scrape | Indian jobs, Bengaluru/Bangalore only, INR salary parsing |
+| **Shine** | HTML adapter | Current page layout has no readable cards; reports an error instead of silent success. Other Bengaluru sources remain available. |
 | **Internshala** | HTML scrape | Indian fresher/intern jobs, Bengaluru only |
 | **Hasjob** | Atom feed | Indian tech/startup jobs, Bengaluru only |
 | **Company career pages** | ATS JSON APIs | Finnish IT employers via Greenhouse / Teamtailor / SmartRecruiters (see `data/finnish_companies.json`) |
@@ -78,13 +86,23 @@ chmod +x setup.sh start_server.sh stop_server.sh server_status.sh
 
 Then open http://127.0.0.1:8006/ in your browser — the **onboarding wizard** runs on first visit and personalises the ranking in about a minute.
 
+### Run offline regression tests
+
+The 40 regression tests cover rendered HTML safety, profile persistence and validation, filtering, tracking, deduplication, source parsing, cached fallbacks, background refresh state, salary parsing, and SQLite reader/writer concurrency. They use isolated databases and fixtures, do not contact job boards, and send no notifications:
+
+```powershell
+.\.venv\Scripts\python.exe -m unittest discover -s tests -v
+```
+
+On macOS/Linux, use `.venv/bin/python -m unittest discover -s tests -v`.
+
 ### Install as an app (PWA)
 
 - **Android/Chrome**: open the dashboard → menu → *Install app* (or tap the install button in the nav when it appears).
 - **iOS/Safari**: open the dashboard → Share → *Add to Home Screen*.
 - **Desktop Chrome/Edge**: install icon in the address bar.
 
-The installed app works offline for previously loaded pages and syncs your profile when back online.
+The worker covers the root app scope and caches assets plus previously loaded pages for offline reading. Live API state is never cached. Saving preferences, tracking and refreshing jobs require the server. A phone must have an appropriate secure/LAN deployment; its own `127.0.0.1` is not this Windows machine. Native phone installation has not been tested in this review.
 
 ### Optional: auto-restart watchdog
 
@@ -103,7 +121,7 @@ To keep the server running across crashes and reboots, install the watchdog — 
 
 Watchdog activity is logged to `logs/watchdog.log`.
 
-> The first start takes 1–2 minutes: the app fetches jobs from all sources before it binds the port. Watch progress in `logs/uvicorn.err.log`. Check later runs with `.\server_status.ps1` or `./server_status.sh`.
+> Startup opens the dashboard immediately and fetches jobs in the background. The status line and **Source health** show actual progress. Refresh does not reload or discard an in-progress form; select **Show updated jobs** after it finishes. `GET /health` checks database readiness, not just whether a port is listening.
 
 The default port is `8006`; you can change it in the start scripts if port 8000 is free on your machine.
 
@@ -158,7 +176,7 @@ DEFAULT_PREFERRED_TECH=python,javascript,typescript,react,node.js,sql,docker,aws
 DEFAULT_PREFERRED_LOCATIONS=helsinki,espoo,vantaa,tampere,turku,oulu
 ```
 
-Only new jobs with a score ≥ `ALERT_THRESHOLD` trigger alerts.
+Only new jobs at or above the saved Profile/onboarding threshold trigger alerts; `ALERT_THRESHOLD` is the initial default. Blank channels are disabled. CSV and JSON arrays are both accepted for default technology/location lists. Source requests are bounded by `SOURCE_CONCURRENCY=3` and `SOURCE_TIMEOUT_SECONDS=120`.
 
 ## Frontend architecture
 
@@ -169,7 +187,7 @@ The UI is server-rendered Jinja2 with a compiled Tailwind CSS design system — 
 - `src/static/app.css` — **compiled** Tailwind output (committed; includes the vendored Inter font and component classes).
 - `src/static/vendor/alpine.min.js` — vendored Alpine.js for wizard steps, drawers, and popovers.
 - `src/static/sw.js` + `manifest.webmanifest` — PWA service worker (app-shell precache, network-first pages) and install manifest.
-- `src/static/js/app.js` / `profile.js` — UI helpers (theme, toasts, refresh, install prompt) and the local-first profile sync layer.
+- `src/static/js/app.js` / `profile.js` / `onboarding.js` — UI helpers, truthful background-refresh polling, timestamp-aware local profile sync, and the external Alpine wizard component. JSON configuration lives in an escaped data script, not a quote-sensitive HTML JavaScript attribute.
 
 **Rebuilding the CSS** (only needed after editing templates/styles):
 
@@ -219,9 +237,12 @@ jobhunt/
 
 A few useful endpoints while the server is running:
 
-- `GET /api/jobs` — ranked JSON list of visible jobs (default top 100)
+- `GET /api/jobs` — ranked JSON list (default top 100, limit 1–500, nonnegative skip), with the same field/location/source/work/tracking filters as the feed
 - `GET /api/locations` — distinct locations used by the dashboard location filter
-- `POST /fetch` — trigger an immediate refresh
+- `POST /fetch` — start/join one background refresh and return HTTP 202 immediately
+- `GET /api/fetch/status` — progress, counts, per-source fresh/cached/empty/error/disabled state
+- `GET /api/profile` / `POST /api/profile` — read or validate/save the profile
+- `GET /health` — app and database readiness; unavailable database returns HTTP 503
 - `POST /hide/{job_id}` — hide a job from the dashboard
 
 Interactive docs are available at `/docs`.
@@ -254,7 +275,7 @@ Set the relevant environment variables in `.env`; leave channels blank to disabl
 
 ## Disclaimer
 
-This project uses public or undocumented APIs and HTML scraping for personal job-search aggregation. Use responsibly and respect each source's terms of service. LinkedIn scraping is done sparingly and is designed to fall back to cached snapshots if blocked.
+This is a local, single-user app, not a hosted multi-user service. Public APIs/HTML layouts can change; source status and cached fallbacks are not guarantees of complete or current vacancy coverage. Respect source terms and robots policies. LinkedIn is disabled by default. Email/webhook delivery and actual mobile installation were not exercised with real credentials/devices in this review.
 
 ## License
 

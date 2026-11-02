@@ -1,0 +1,4 @@
+{% extends 'hosted/base.html' %}
+{% from 'hosted/components.html' import icon %}
+{% block title %}Offline — JobHunt{% endblock %}
+{% block content %}<section class="offline-content"><span class="empty-icon">{{ icon('wifi') }}</span><span class="eyebrow">A SHORT PAUSE</span><h1>Your connection took a detour.</h1><p>You can revisit public job details you've opened on this device. Sign-in, saving and private tracker changes need an internet connection.</p><a class="button" href="/">Try again {{ icon('refresh') }}</a><div class="offline-jobs" id="offline-jobs"></div><p class="small muted" style="margin-top:24px">Cached listings may be out of date. Check the original listing when you're back online.</p></section>{% endblock %}

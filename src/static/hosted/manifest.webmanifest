@@ -1,0 +1,23 @@
+{
+  "id": "/",
+  "name": "JobHunt — Your next direction",
+  "short_name": "JobHunt",
+  "description": "Personalised job discovery, a useful shortlist and clear application tracking.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f5f4ef",
+  "theme_color": "#245b46",
+  "lang": "en",
+  "categories": ["productivity", "business"],
+  "prefer_related_applications": false,
+  "icons": [
+    {"src": "/static/hosted/icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable"},
+    {"src": "/static/hosted/icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable"}
+  ],
+  "shortcuts": [
+    {"name": "Discover opportunities", "url": "/discover"},
+    {"name": "Your shortlist", "url": "/saved"},
+    {"name": "Application tracker", "url": "/tracker"}
+  ]
+}
