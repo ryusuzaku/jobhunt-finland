@@ -23,6 +23,7 @@
       } catch (e) {}
     })();
   </script>
+  {% block page_scripts %}{% endblock %}
   <script defer src="/static/vendor/alpine.min.js"></script>
   <script defer src="/static/js/profile.js"></script>
   <script defer src="/static/js/app.js"></script>
@@ -72,6 +73,14 @@
 
   {# ============ Page content ============ #}
   <main class="mx-auto w-full max-w-7xl flex-1 px-4 pb-24 sm:px-6 md:pb-10">
+    <div class="mt-4 text-xs text-slate-500 dark:text-slate-400">
+      <p id="fetch-status" role="status">Checking job refresh status…</p>
+      <button id="reload-jobs" type="button" class="btn-ghost hidden mt-2">Show updated jobs</button>
+      <details class="mt-1">
+        <summary class="cursor-pointer">Source health</summary>
+        <ul id="source-status" class="mt-2 space-y-1"></ul>
+      </details>
+    </div>
     {% block content %}{% endblock %}
   </main>
 

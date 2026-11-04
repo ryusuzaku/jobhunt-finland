@@ -21,6 +21,10 @@ logger = logging.getLogger(__name__)
 _CARD_SELECTOR = "div.jobCardNova_bigCard__W2xn3"
 
 
+class SourceLayoutError(RuntimeError):
+    """The upstream page has no server-readable listing cards."""
+
+
 class ShineSource:
     """Shine.com HTML search results (Bengaluru tech jobs)."""
 
@@ -60,7 +64,7 @@ class ShineSource:
                 soup = BeautifulSoup(resp.text, "html.parser")
                 cards = soup.select(_CARD_SELECTOR)
                 if not cards:
-                    break
+                    raise SourceLayoutError("Shine currently has no server-readable listing cards")
 
                 for card in cards:
                     parsed = self._parse_card(card)

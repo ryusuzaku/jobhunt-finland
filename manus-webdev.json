@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "projectId": "wdp_0762a695a108fd7d9f159e42",
+  "description": "JobHunt Finland: existing job aggregation, personalized discovery and application tracking, being redesigned as a phone-first hosted PWA with secure cross-device profiles and saved jobs.",
+  "managedGit": {
+    "baseCommit": "74be58282882e9894939f7c73a24a2a76a8a6473"
+  }
+}

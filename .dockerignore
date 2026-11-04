@@ -1,0 +1,15 @@
+.git
+.env
+.env.*
+!.env.example
+.venv
+.work
+.manus
+outputs
+inputs
+**/__pycache__
+data/*.db
+data/*.db-*
+data/fetch_snapshot.json
+*.pid
+*.log

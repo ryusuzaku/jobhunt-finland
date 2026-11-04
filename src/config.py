@@ -1,5 +1,8 @@
 from pathlib import Path
-from pydantic_settings import BaseSettings
+import json
+from typing import Annotated
+from pydantic import Field, field_validator
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 ROOT_DIR = Path(__file__).resolve().parent.parent
 DATA_DIR = ROOT_DIR / "data"
@@ -9,6 +12,7 @@ DATA_DIR.mkdir(exist_ok=True)
 class Settings(BaseSettings):
     app_name: str = "JobHunt Finland"
     debug: bool = False
+    app_log_file: str = str(ROOT_DIR / "logs" / "application.log")
 
     # Optional "Support this project" link (Ko-fi / Sponsors / ...).
     # Shown in the footer and empty states when set; hidden otherwise.
@@ -24,6 +28,9 @@ class Settings(BaseSettings):
     user_agent: str = "JobHunt-FI/1.0 (personal job search aggregator)"
     request_timeout: int = 30
     cache_ttl_seconds: int = 1800  # 30 minutes
+    source_timeout_seconds: int = Field(default=120, ge=1, le=600)
+    source_concurrency: int = Field(default=3, ge=1, le=5)
+    enable_linkedin: bool = False  # Restricted source: requires an explicit local opt-in.
 
     # Duunitori API
     duunitori_base_url: str = "https://duunitori.fi/api/v1/jobentries"
@@ -31,7 +38,7 @@ class Settings(BaseSettings):
     duunitori_max_pages_per_term: int = 10
 
     # The Hub API
-    thehub_base_url: str = "https://thehub.io/api/jobs"
+    thehub_base_url: str = "https://thehub.io/jobs/location/finland"
 
     # EnglishJobs.fi
     englishjobs_base_url: str = "https://englishjobs.fi/jobs"
@@ -71,18 +78,18 @@ class Settings(BaseSettings):
     company_careers_file: str = str(DATA_DIR / "finnish_companies.json")
 
     # Default preferences (can be overridden via dashboard)
-    default_preferred_tech: list[str] = [
+    default_preferred_tech: Annotated[list[str], NoDecode] = [
         "python", "javascript", "typescript", "react", "node.js",
         "sql", "docker", "aws", "azure", "git", "c#", "java",
     ]
-    default_preferred_locations: list[str] = [
+    default_preferred_locations: Annotated[list[str], NoDecode] = [
         "helsinki", "espoo", "vantaa", "tampere", "turku", "oulu",
         "bengaluru", "bangalore",
     ]
 
     # Locations that are allowed to appear in the dashboard and API.
     # Jobs whose location does not contain one of these tokens are hidden.
-    allowed_dashboard_locations: list[str] = [
+    allowed_dashboard_locations: Annotated[list[str], NoDecode] = [
         "helsinki", "espoo", "vantaa", "tampere", "turku", "lahti",
         "bengaluru", "bangalore",
         # Some sources (e.g. Jobly) only say "Finland" for country-wide
@@ -110,9 +117,14 @@ class Settings(BaseSettings):
     discord_webhook_url: str | None = None
     slack_webhook_url: str | None = None
 
-    class Config:
-        env_file = ROOT_DIR / ".env"
-        env_file_encoding = "utf-8"
+    model_config = SettingsConfigDict(env_file=ROOT_DIR / ".env", env_file_encoding="utf-8", extra="ignore")
+
+    @field_validator("default_preferred_tech", "default_preferred_locations", "allowed_dashboard_locations", mode="before")
+    @classmethod
+    def parse_csv_or_json_list(cls, value):
+        if isinstance(value, str):
+            value = json.loads(value) if value.lstrip().startswith("[") else value.split(",")
+        return list(dict.fromkeys(item.strip().lower() for item in value if item.strip()))
 
 
 settings = Settings()

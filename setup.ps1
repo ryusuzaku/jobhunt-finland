@@ -1,6 +1,7 @@
 # One-time setup for JobHunt Finland on Windows.
 # Creates the virtual environment, installs dependencies, seeds .env, and creates data/log directories.
 
+$ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $MyInvocation.MyCommand.Definition
 $Venv = Join-Path $Root ".venv"
 $Python = "python"
@@ -18,6 +19,7 @@ if (-not $?) {
 if (-not (Test-Path $Venv)) {
     Write-Host "Creating virtual environment in $Venv..." -ForegroundColor Green
     & $Python -m venv $Venv
+    if ($LASTEXITCODE -ne 0) { throw 'Virtual environment creation failed.' }
 } else {
     Write-Host "Virtual environment already exists." -ForegroundColor Yellow
 }
@@ -26,9 +28,11 @@ $Pip = Join-Path $Venv "Scripts\pip.exe"
 
 Write-Host "Upgrading pip..." -ForegroundColor Green
 & $Pip install --upgrade pip
+if ($LASTEXITCODE -ne 0) { throw 'pip upgrade failed.' }
 
 Write-Host "Installing dependencies from requirements.txt..." -ForegroundColor Green
 & $Pip install -r (Join-Path $Root "requirements.txt")
+if ($LASTEXITCODE -ne 0) { throw 'Dependency installation failed.' }
 
 # Seed .env from example if the user has not created one
 if (-not (Test-Path (Join-Path $Root ".env"))) {

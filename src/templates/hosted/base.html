@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#245b46">
+  <meta name="description" content="A clearer way to find your next role. Personalised job discovery, saved jobs and application tracking.">
+  <title>{% block title %}JobHunt — Your next direction{% endblock %}</title>
+  <link rel="manifest" href="/manifest.webmanifest">
+  <link rel="icon" href="/static/hosted/icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="/static/hosted/icons/apple-touch-icon.png">
+  <link rel="preload" href="/static/fonts/inter-var.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="/static/hosted/style.css?v=3">
+  <script id="app-config" type="application/json">{{ {'user_id': user.id if user else none, 'csrf_token': csrf_token|default(''), 'revision': profile.revision|default(0) if profile else 0, 'page': page|default('landing')}|tojson }}</script>
+  <script src="/static/hosted/app.js?v=3" defer></script>
+  {% block scripts %}{% endblock %}
+</head>
+<body class="{% if not user %}public-page{% endif %} {% if page|default('') == 'onboarding' %}setup-page{% endif %}">
+  {% from 'hosted/components.html' import icon %}
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="connectivity" id="connectivity" role="status" hidden>You're offline. Cached public job details are available; changes need a connection.</div>
+  <header class="mobile-header">
+    <a class="brand" href="/" aria-label="JobHunt home"><img src="/static/hosted/icons/icon-192.png" width="31" height="31" alt=""><span>jobhunt<span class="brand-period">.</span></span></a>
+    {% if user %}<a class="avatar" href="/profile" aria-label="Your profile">{{ (user.name|default('You', true))[:1]|upper }}</a>{% else %}<a class="button button-small" href="/auth/start" data-signin>Sign in {{ icon('arrow') }}</a>{% endif %}
+  </header>
+  {% if user and page|default('') != 'onboarding' %}
+  <aside class="sidebar">
+    <a class="brand" href="/"><img src="/static/hosted/icons/icon-192.png" width="34" height="34" alt=""><span>jobhunt<span class="brand-period">.</span></span></a>
+    <p class="sidebar-kicker">YOUR NEXT DIRECTION</p>
+    <nav class="side-nav" aria-label="Main navigation">
+      {% for path, key, label, glyph in [('/discover','discover','Discover','compass'),('/saved','saved','Saved','bookmark'),('/tracker','tracker','Tracker','layers'),('/profile','profile','Profile','person')] %}
+      <a href="{{ path }}" class="nav-item {% if page|default('') == key %}active{% endif %}" {% if page|default('') == key %}aria-current="page"{% endif %}>{{ icon(glyph) }}<span>{{ label }}</span>{% if key == 'discover' %}<span class="nav-arrow">↗</span>{% endif %}</a>
+      {% endfor %}
+    </nav>
+    <div class="sidebar-note"><span class="tiny-label">A LITTLE LESS NOISE</span><p>Good opportunities.<br>A clear next step.</p><button class="text-button" type="button" data-install>Keep JobHunt on your phone {{ icon('arrow') }}</button></div>
+    <div class="sidebar-user"><span class="avatar">{{ (user.name|default('You', true))[:1]|upper }}</span><div><strong>{{ user.name|default('Your account', true) }}</strong><span>Personal workspace</span></div></div>
+  </aside>
+  {% endif %}
+  <main id="main" class="main {% block main_class %}{% endblock %}" tabindex="-1">{% block content %}{% endblock %}</main>
+  {% if user and page|default('') != 'onboarding' %}
+  <nav class="bottom-nav" aria-label="Main navigation">
+    {% for path, key, label, glyph in [('/discover','discover','Discover','compass'),('/saved','saved','Saved','bookmark'),('/tracker','tracker','Tracker','layers'),('/profile','profile','Profile','person')] %}
+    <a href="{{ path }}" {% if page|default('') == key %}class="active" aria-current="page"{% endif %}>{{ icon(glyph) }}<span>{{ label }}</span></a>
+    {% endfor %}
+  </nav>
+  {% endif %}
+  <div class="toast-stack" id="toasts" aria-live="polite" aria-atomic="false"></div>
+  <dialog class="install-dialog" id="install-dialog" aria-labelledby="install-title"><button class="icon-button dialog-close" type="button" data-close-dialog aria-label="Close installation instructions">{{ icon('close') }}</button><span class="eyebrow">CLOSER TO YOUR NEXT ROLE</span><h2 id="install-title">Keep your hunt handy.</h2><p>Open JobHunt from your phone's home screen, just like an app.</p><div id="install-instructions"></div><p class="small muted">An internet connection is needed to sign in, save jobs and sync your tracker.</p><button class="button full-width" type="button" data-close-dialog>Got it</button></dialog>
+  <dialog class="confirm-dialog" id="confirm-dialog" aria-labelledby="confirm-title"><h2 id="confirm-title">Remove this tracker entry?</h2><p>The job remains available. Your notes, dates and outcome for this entry will be removed.</p><div class="button-row"><button class="button button-secondary" data-cancel-confirm type="button">Keep entry</button><button class="button button-danger" data-accept-confirm type="button">Remove entry</button></div></dialog>
+</body>
+</html>

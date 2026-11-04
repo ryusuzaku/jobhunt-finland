@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import re
 import unicodedata
@@ -48,6 +49,7 @@ SOURCES = [
 ]
 
 snapshot_cache = JobSnapshotCache()
+SOURCE_STATUS = {}
 
 
 async def fetch_all_jobs(profiles: list[str] | None = None) -> tuple[list[dict], dict[str, set[str]]]:
@@ -68,64 +70,61 @@ async def fetch_all_jobs(profiles: list[str] | None = None) -> tuple[list[dict],
           prune stale DB rows for sources that succeeded this run.
     """
     active = selected_profiles(profiles)
+    filter_profiles = active or ["software", "frontend", "data", "devops", "mobile", "qa", "security"]
     limits = httpx.Limits(max_keepalive_connections=5, max_connections=10)
     fetched_sources: dict[str, set[str]] = {}
+    semaphore = asyncio.Semaphore(max(1, settings.source_concurrency))
+    SOURCE_STATUS.clear()
+
+    async def fetch_source(source, client):
+        name = source.name
+        if name == "linkedin" and not settings.enable_linkedin:
+            SOURCE_STATUS[name] = {"status": "disabled", "count": 0}
+            return [], set()
+        SOURCE_STATUS[name] = {"status": "queued", "count": 0}
+        async with semaphore:
+            SOURCE_STATUS[name] = {"status": "running", "count": 0}
+            source.active_profiles = active
+            previous = snapshot_cache.get(name)
+            ids = set()
+            try:
+                raw = await asyncio.wait_for(source.fetch(client), timeout=settings.source_timeout_seconds)
+                normalized = []
+                for item in raw:
+                    try:
+                        norm = source.normalize(item)
+                        if norm:
+                            normalized.append(norm)
+                    except Exception:
+                        logger.warning("Normalization error for %s", name, exc_info=True)
+                if normalized:
+                    snapshot_cache.update(name, normalized)
+                    ids = {j.get("source_id") for j in normalized if j.get("source_id")}
+                    state = "fresh"
+                else:
+                    normalized = previous
+                    state = "cached" if previous else "empty"
+                kept = [j for j in normalized if keep_job(j.get("title"), j.get("description"), filter_profiles)]
+                SOURCE_STATUS[name] = {"status": state, "count": len(kept)}
+                return kept, ids
+            except Exception as exc:
+                logger.warning("Source %s failed: %s", name, exc)
+                kept = [j for j in previous if keep_job(j.get("title"), j.get("description"), filter_profiles)]
+                SOURCE_STATUS[name] = {"status": "cached" if previous else "error", "count": len(kept), "error": type(exc).__name__}
+                return kept, set()
+
     async with CachedAsyncClient(
         timeout=settings.request_timeout,
         limits=limits,
         ttl=getattr(settings, "cache_ttl_seconds", 1800),
         follow_redirects=True,
     ) as client:
-        all_raw: list[dict] = []
-        for source in SOURCES:
-            source_name = source.name
-            source.active_profiles = active
-            previous = snapshot_cache.get(source_name)
-            source_ids: set[str] = set()
-            try:
-                raw = await source.fetch(client)
-                normalized = []
-                for item in raw:
-                    try:
-                        norm = source.normalize(item)
-                        if norm and (not active or keep_job(norm.get("title"), norm.get("description"), active)):
-                            normalized.append(norm)
-                    except Exception as exc:
-                        logger.warning("Normalization error for %s: %s", source_name, exc)
-
-                if not normalized and previous:
-                    logger.info(
-                        "%s returned no jobs; falling back to %d cached snapshot jobs",
-                        source_name,
-                        len(previous),
-                    )
-                    normalized = previous
-                else:
-                    new, removed = snapshot_cache.diff(source_name, normalized)
-                    if new or removed:
-                        logger.info(
-                            "%s snapshot diff: +%d new, -%d removed",
-                            source_name,
-                            len(new),
-                            len(removed),
-                        )
-                    # Only prune this source if the fetch itself succeeded.
-                    source_ids = {j.get("source_id") for j in normalized if j.get("source_id")}
-
-                snapshot_cache.update(source_name, normalized)
-                all_raw.extend(normalized)
-                logger.info("%s contributed %d jobs", source_name, len(normalized))
-                if source_ids:
-                    fetched_sources[source_name] = source_ids
-            except Exception as exc:
-                logger.error("Source %s failed: %s", source_name, exc)
-                if previous:
-                    logger.info(
-                        "%s failed; using %d cached snapshot jobs",
-                        source_name,
-                        len(previous),
-                    )
-                    all_raw.extend(previous)
+        results = await asyncio.gather(*(fetch_source(source, client) for source in SOURCES))
+        all_raw = []
+        for source, (jobs, ids) in zip(SOURCES, results):
+            all_raw.extend(jobs)
+            if ids:
+                fetched_sources[source.name] = ids
         return all_raw, fetched_sources
 
 
@@ -210,6 +209,8 @@ def save_jobs(db: Session, normalized_jobs: list[dict], prefs: dict | None = Non
                 company_score=scores["company_score"],
             )
             db.add(new_job)
+            # autoflush=False: make this row visible to later duplicate IDs in the batch.
+            db.flush()
             new_count += 1
 
     db.commit()
@@ -329,11 +330,11 @@ def dedupe_jobs(db: Session) -> int:
         survivors.extend(j for j in group if j is keeper or j.application)
 
     # --- Pass 2: cross-source duplicates among the survivors
-    groups: dict[tuple[str, str], list[Job]] = {}
+    groups: dict[tuple[str, str, str], list[Job]] = {}
     for job in survivors:
         title_key = _norm_text(job.title or "")
         company_key = _norm_company(job.company or "")
-        groups.setdefault((title_key, company_key), []).append(job)
+        groups.setdefault((title_key, company_key, _norm_location(job.location or "")), []).append(job)
 
     for group in groups.values():
         # Keep the best row per source (pass 1 already collapsed
@@ -381,6 +382,7 @@ def prune_stale_jobs(
                 Job.source == source,
                 Job.source_id.notin_(source_ids),
                 Job.updated_at < cutoff,
+                ~Job.application.has(),
             )
             .all()
         )

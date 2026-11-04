@@ -2,75 +2,11 @@
 
 {% block title %}Welcome — JobHunt{% endblock %}
 
+{% block page_scripts %}<script defer src="/static/js/onboarding.js"></script>{% endblock %}
+
 {% block content %}
-<div class="mx-auto mt-6 max-w-2xl"
-     x-data="{
-       step: 1,
-       tracks: {{ (prefs.job_profiles or prefs.role_tracks or []) | tojson }},
-       level: {{ (prefs.experience_level or 'junior') | tojson }},
-       techs: {{ (prefs.preferred_tech or []) | tojson }},
-       techSearch: '',
-       locations: {{ (prefs.preferred_locations or []) | tojson }},
-       remoteOk: {{ 'true' if prefs.remote_ok else 'false' }},
-       hybridOk: {{ 'true' if prefs.hybrid_ok else 'false' }},
-       threshold: {{ (prefs.alert_threshold or 60) | int }},
-       saving: false,
-       skillMap: {{ skill_map | tojson }},
-       labelMap: {{ label_map | tojson }},
-       defaultPresets: ['python','javascript','typescript','react','node.js','java','c#','c++','go','rust','php','ruby','swift','kotlin','sql','postgresql','mysql','mongodb','redis','docker','kubernetes','aws','azure','gcp','terraform','linux','git','html','css','vue','angular','django','flask','fastapi','spring','.net','graphql','tensorflow','pytorch','pandas'],
-       get filteredPresets() {
-         let pool = [...this.defaultPresets];
-         for (const t of this.tracks) {
-           if (this.skillMap[t]) pool.push(...this.skillMap[t]);
-         }
-         pool = [...new Set(pool)];
-         const q = this.techSearch.toLowerCase().trim();
-         return pool.filter(t => !this.techs.includes(t) && (!q || t.includes(q))).slice(0, 14);
-       },
-       toggleTrack(t) {
-         this.tracks.includes(t) ? this.tracks = this.tracks.filter(x => x !== t) : this.tracks.push(t);
-       },
-       toggleLocation(l) {
-         this.locations.includes(l) ? this.locations = this.locations.filter(x => x !== l) : this.locations.push(l);
-       },
-       addTech(t) {
-         t = t.toLowerCase().trim();
-         if (t && !this.techs.includes(t)) this.techs.push(t);
-         this.techSearch = '';
-       },
-       removeTech(t) { this.techs = this.techs.filter(x => x !== t); },
-       async finish(skipped) {
-         if (this.saving) return;
-         this.saving = true;
-         const profile = skipped ? { onboarding_completed: true } : {
-           job_profiles: this.tracks,
-           experience_level: this.level,
-           preferred_tech: this.techs,
-           preferred_locations: this.locations,
-           remote_ok: this.remoteOk,
-           hybrid_ok: this.hybridOk,
-           alert_threshold: this.threshold,
-           onboarding_completed: true,
-         };
-         try {
-           const r = await fetch('/api/profile', {
-             method: 'POST',
-             headers: { 'Content-Type': 'application/json' },
-             body: JSON.stringify(profile),
-           });
-           const data = await r.json();
-           if (data.ok) {
-             try { localStorage.setItem('jh-profile', JSON.stringify(data.profile)); } catch (e) {}
-             window.location.href = '/';
-             return;
-           }
-           window.toast && toast('Could not save profile', 'error');
-         } catch (e) {
-           window.toast && toast('Could not save profile', 'error');
-         }
-         this.saving = false;
-       }
-     }">
+<script type="application/json" id="onboarding-config">{{ {'prefs': prefs, 'skillMap': skill_map, 'labelMap': label_map} | tojson }}</script>
+<div class="mx-auto mt-6 max-w-2xl" x-data="onboarding">
 
   {# Header + progress #}
   <div class="mb-6 text-center">
@@ -97,6 +33,7 @@
       <div class="mt-2 grid grid-cols-2 gap-2.5">
         {% for key, track in role_tracks.items() if track.group == group %}
         <button type="button" @click="toggleTrack('{{ key }}')"
+                :aria-pressed="tracks.includes('{{ key }}')"
                 :class="tracks.includes('{{ key }}') ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/50' : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600'"
                 class="flex items-center gap-2.5 rounded-xl border-2 p-3.5 text-left transition">
           <span class="text-xl" aria-hidden="true">{{ track.icon }}</span>
@@ -119,6 +56,7 @@
           ("mid", "Mid-level", "2–4 years — open to a bit more seniority"),
         ] %}
         <button type="button" @click="level = '{{ val }}'"
+                :aria-pressed="level === '{{ val }}'"
                 :class="level === '{{ val }}' ? 'border-brand-500 bg-brand-50 dark:bg-brand-950/50' : 'border-slate-200 bg-white hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600'"
                 class="flex w-full items-center justify-between rounded-xl border-2 p-4 text-left transition">
           <span>
@@ -165,18 +103,21 @@
       <div class="mt-4 flex flex-wrap gap-1.5">
         {% for town in ["helsinki", "espoo", "vantaa", "tampere", "turku", "oulu", "bengaluru", "finland", "europe", "worldwide", "remote"] %}
         <button type="button" @click="toggleLocation('{{ town }}')"
+                :aria-pressed="locations.includes('{{ town }}')"
                 :class="locations.includes('{{ town }}') ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300' : 'border-slate-200 bg-white text-slate-500 hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400'"
                 class="chip border-2 px-3.5 py-2 capitalize transition">{{ town }}</button>
         {% endfor %}
       </div>
       <div class="mt-4 grid grid-cols-1 gap-2.5 sm:grid-cols-2">
         <button type="button" @click="remoteOk = !remoteOk"
+                :aria-pressed="remoteOk"
                 :class="remoteOk ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/40' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'"
                 class="rounded-xl border-2 p-4 text-left transition">
           <span class="block text-sm font-bold text-slate-800 dark:text-slate-200">🌍 Remote-friendly</span>
           <span class="block text-xs text-slate-500 dark:text-slate-400">Boost fully remote roles</span>
         </button>
         <button type="button" @click="hybridOk = !hybridOk"
+                :aria-pressed="hybridOk"
                 :class="hybridOk ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/40' : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'"
                 class="rounded-xl border-2 p-4 text-left transition">
           <span class="block text-sm font-bold text-slate-800 dark:text-slate-200">🏢 Hybrid-friendly</span>
@@ -201,7 +142,7 @@
       <div class="mt-5 rounded-xl bg-slate-50 p-4 text-sm dark:bg-slate-800/60">
         <p class="font-bold text-slate-800 dark:text-slate-200">Your setup</p>
         <ul class="mt-2 space-y-1 text-xs text-slate-600 dark:text-slate-300">
-          <li>🎯 <span x-text="tracks.length ? tracks.map(t => labelMap[t] || t).join(', ') : 'all fields'"></span></li>
+          <li>🎯 <span x-text="tracks.length ? tracks.map(t => labelMap[t] || t).join(', ') : 'default tech search'"></span></li>
           <li>📈 <span x-text="level"></span></li>
           <li>🛠️ <span x-text="techs.length ? techs.slice(0, 6).join(', ') + (techs.length > 6 ? '…' : '') : 'any stack'"></span></li>
           <li>📍 <span x-text="locations.length ? locations.join(', ') : 'anywhere'"></span>
@@ -211,6 +152,7 @@
     </section>
 
     {# Navigation #}
+    <p x-show="error" x-text="error" x-cloak role="alert" class="mt-4 text-sm text-rose-600"></p>
     <div class="mt-7 flex items-center justify-between gap-3">
       <button type="button" x-show="step > 1" @click="step--" class="btn-ghost">← Back</button>
       <button type="button" x-show="step === 1" @click="finish(true)" class="btn-ghost text-slate-400">Skip setup</button>

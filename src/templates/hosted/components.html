@@ -1,0 +1,21 @@
+{% macro icon(name, cls='') -%}
+<svg class="icon {{ cls }}" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+{% if name == 'bookmark' %}<path d="M6 4h12v17l-6-4-6 4z"/>{% elif name == 'compass' %}<circle cx="12" cy="12" r="9"/><path d="m16 8-3 5-5 3 3-5z"/>{% elif name == 'layers' %}<path d="m12 3 9 5-9 5-9-5zM3 12l9 5 9-5M3 16l9 5 9-5"/>{% elif name == 'person' %}<circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/>{% elif name == 'arrow' %}<path d="M5 12h14m-6-6 6 6-6 6"/>{% elif name == 'external' %}<path d="M14 4h6v6M20 4l-9 9M10 4H4v16h16v-6"/>{% elif name == 'search' %}<circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/>{% elif name == 'filter' %}<path d="M4 7h16M4 17h16"/><circle cx="9" cy="7" r="2" fill="var(--surface)"/><circle cx="15" cy="17" r="2" fill="var(--surface)"/>{% elif name == 'pin' %}<path d="M19 10c0 5-7 11-7 11S5 15 5 10a7 7 0 1 1 14 0z"/><circle cx="12" cy="10" r="2.3"/>{% elif name == 'refresh' %}<path d="M20 7v5h-5M4 17v-5h5"/><path d="M6 6a8 8 0 0 1 14 6M4 12a8 8 0 0 0 14 6"/>{% elif name == 'check' %}<path d="m5 12 4 4L19 6"/>{% elif name == 'close' %}<path d="m6 6 12 12M6 18 18 6"/>{% elif name == 'chevron' %}<path d="m8 5 7 7-7 7"/>{% elif name == 'clock' %}<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>{% elif name == 'briefcase' %}<rect x="3" y="7" width="18" height="14" rx="2"/><path d="M8 7V3h8v4M3 12h18M10 12v3h4v-3"/>{% elif name == 'edit' %}<path d="m15 4 5 5M4 20l5-1L21 7l-5-5L4 14z"/>{% elif name == 'download' %}<path d="M12 3v12m-5-5 5 5 5-5M4 16v5h16v-5"/>{% elif name == 'wifi' %}<path d="M3 8a15 15 0 0 1 18 0M6 12a10 10 0 0 1 12 0M9 16a5 5 0 0 1 6 0"/><circle cx="12" cy="20" r=".8"/>{% elif name == 'plus' %}<path d="M12 5v14M5 12h14"/>{% elif name == 'back' %}<path d="M19 12H5m6-6-6 6 6 6"/>{% else %}<circle cx="12" cy="12" r="8"/>{% endif %}
+</svg>
+{%- endmacro %}
+
+{% macro job_card(job) %}
+<article class="job-card" aria-labelledby="job-title-{{ job.id }}" data-job-card="{{ job.id }}">
+  <div class="company-monogram" aria-hidden="true">{{ (job.company|default('?', true))[:1]|upper }}</div>
+  <div class="job-card-main"><div class="company-line"><span>{{ job.company|default('Company not listed', true) }}</span>{% if job.date_posted %}<span class="posting-date">{{ job.date_posted|string|truncate(10, true, '') }}</span>{% endif %}</div>
+    <h2 id="job-title-{{ job.id }}"><a href="/jobs/{{ job.id }}">{{ job.title }}</a></h2>
+    <div class="job-metadata"><span>{{ icon('pin') }}{{ job.location|default('Location not listed', true) }}</span>{% if job.remote %}<span class="work-tag">Remote-friendly</span>{% elif job.hybrid %}<span class="work-tag">Hybrid</span>{% endif %}{% if job.salary_text %}<span class="salary">{{ job.salary_text }}</span>{% endif %}</div>
+    <div class="job-card-footer"><span class="source-label">{{ job.source|replace('_',' ')|title }}</span>{% if job.application and job.application.status != 'saved' %}<span class="status-badge status-{{ job.application.status }}">{{ job.application.status|title }}</span>{% endif %}{% if job.match_reasons %}<span class="match-reason">{{ job.match_reasons[0] }}</span>{% endif %}</div>
+  </div>
+  <div class="job-card-actions"><a class="match-score {% if job.score|default(0) >= 60 %}strong{% endif %}" href="/jobs/{{ job.id }}#match" aria-label="Match guide: {{ job.score|default(0)|round|int }} out of 100, see explanation"><strong>{{ job.score|default(0)|round|int }}<span>%</span></strong><span>match</span></a><button class="icon-button save-button {% if job.saved %}is-saved{% endif %}" type="button" data-save-job="{{ job.id }}" aria-pressed="{{ 'true' if job.saved else 'false' }}" aria-label="{{ 'Unsave' if job.saved else 'Save' }} {{ job.title }}">{{ icon('bookmark') }}</button></div>
+</article>
+{% endmacro %}
+
+{% macro empty_state(title, message, href='/discover', label='Explore jobs', glyph='compass') %}
+<div class="empty-state"><span class="empty-icon">{{ icon(glyph) }}</span><h2>{{ title }}</h2><p>{{ message }}</p><a class="button button-secondary" href="{{ href }}">{{ label }} {{ icon('arrow') }}</a></div>
+{% endmacro %}
