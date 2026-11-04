@@ -56,5 +56,10 @@ def set_preference(db: Session, key: str, value) -> None:
 def set_preferences(db: Session, updates: dict) -> dict:
     for key, value in updates.items():
         if key in DEFAULT_PREFERENCES:
-            set_preference(db, key, value)
+            row = db.query(Preference).filter(Preference.key == key).first()
+            if row:
+                row.value = _encode(value)
+            else:
+                db.add(Preference(key=key, value=_encode(value)))
+    db.commit()
     return get_preferences(db)

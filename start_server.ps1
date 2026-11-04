@@ -1,50 +1,48 @@
-# Start the JobHunt Finland FastAPI server as a detached background process.
-# Logs are written to logs/uvicorn.log and logs/uvicorn.err.log.
-
+# Start the self-hosted app, detached from this terminal. Compatible with PowerShell 5.1/7.
+$ErrorActionPreference = 'Stop'
 $Port = 8006
-$Root = Split-Path -Parent $MyInvocation.MyCommand.Definition
-$Logs = Join-Path $Root "logs"
+$Root = $PSScriptRoot
+$Python = Join-Path $Root '.venv\Scripts\python.exe'
+$Logs = Join-Path $Root 'logs'
 
-# Run one-time setup if the virtual environment is missing.
-if (-not (Test-Path (Join-Path $Root ".venv"))) {
-    & (Join-Path $Root "setup.ps1")
+if (-not (Test-Path $Python)) {
+    & (Join-Path $Root 'setup.ps1')
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path $Python)) { throw 'Setup failed; server was not started.' }
 }
+& $Python -c 'import fastapi, uvicorn, sqlalchemy, apscheduler, pydantic_settings'
+if ($LASTEXITCODE -ne 0) { throw 'Missing dependencies. Run .\setup.ps1 first.' }
+New-Item -ItemType Directory -Path $Logs -Force | Out-Null
 
-if (-not (Test-Path $Logs)) {
-    New-Item -ItemType Directory -Path $Logs -Force | Out-Null
-}
-
-$Existing = netstat -ano | Select-String ":$Port\s+.*LISTENING\s+(\d+)"
+$Existing = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
 if ($Existing) {
-    $PidOnPort = $Existing.Matches[0].Groups[1].Value
-    Write-Host "Server already running on port $Port (PID $PidOnPort)." -ForegroundColor Yellow
-    exit 0
+    try {
+        $Health = Invoke-RestMethod "http://127.0.0.1:$Port/health" -TimeoutSec 3
+        if ($Health.ok -and $Health.app -eq 'JobHunt Finland') {
+            Write-Host "JobHunt is already running at http://127.0.0.1:$Port/"
+            exit 0
+        }
+    } catch {}
+    throw "Port $Port is occupied. Verify the existing process before stopping it."
 }
 
-Write-Host "Starting uvicorn on port $Port..." -ForegroundColor Green
-
-# Use WMI so the server is fully detached from this PowerShell window/job.
-$Python = Join-Path $Root ".venv\Scripts\python.exe"
-$Cmd = 'cmd.exe /c cd /d ' + $Root + ' && ' + $Python + ' -m uvicorn src.main:app --host 127.0.0.1 --port ' + $Port + ' > logs\uvicorn.log 2> logs\uvicorn.err.log'
-$Proc = Invoke-WmiMethod -Class Win32_Process -Name Create -ArgumentList $Cmd, $Root
-
-if ($Proc.ReturnValue -ne 0) {
-    Write-Host "Failed to start server (WMI return value $($Proc.ReturnValue))." -ForegroundColor Red
-    exit 1
+$Out = Join-Path $Logs 'uvicorn.log'
+$Err = Join-Path $Logs 'uvicorn.err.log'
+$Command = 'cmd.exe /d /s /c ""{0}" -m uvicorn src.main:app --host 127.0.0.1 --port {1} > "{2}" 2> "{3}""' -f $Python, $Port, $Out, $Err
+$Process = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+    CommandLine = $Command
+    CurrentDirectory = $Root
 }
+if ($Process.ReturnValue -ne 0) { throw "Server launch failed (CIM code $($Process.ReturnValue))." }
 
-# Uvicorn binds the port after the lifespan startup fetch completes, which can take ~30-60s.
-Write-Host "Waiting for the first fetch to finish and the port to come up..." -ForegroundColor Cyan
-$Timeout = 120
-$Elapsed = 0
-while ($Elapsed -lt $Timeout) {
-    Start-Sleep -Seconds 2
-    $Elapsed += 2
-    $Check = netstat -ano | Select-String ":$Port\s+.*LISTENING\s+(\d+)"
-    if ($Check) {
-        Write-Host "Server started successfully on http://127.0.0.1:$Port/ (PID $($Check.Matches[0].Groups[1].Value))" -ForegroundColor Green
-        exit 0
-    }
+Write-Host 'Waiting for the dashboard. Jobs refresh in the background.'
+for ($Attempt = 0; $Attempt -lt 30; $Attempt++) {
+    Start-Sleep -Seconds 1
+    try {
+        $Health = Invoke-RestMethod "http://127.0.0.1:$Port/health" -TimeoutSec 2
+        if ($Health.ok) {
+            Write-Host "Dashboard ready: http://127.0.0.1:$Port/" -ForegroundColor Green
+            exit 0
+        }
+    } catch {}
 }
-
-Write-Host "Server did not bind to port $Port within ${Timeout}s. It may still be starting; check logs/uvicorn.err.log" -ForegroundColor Yellow
+throw 'Server failed its startup health check. See logs/uvicorn.err.log.'

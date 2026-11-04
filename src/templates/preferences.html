@@ -12,7 +12,7 @@
 </section>
 
 <form method="post" action="/preferences" class="mx-auto mt-6 max-w-2xl space-y-5"
-      x-data="{ towns: {{ (prefs.preferred_locations or []) | tojson }} }">
+      x-data="{ towns: {{ (prefs.preferred_locations or []) | tojson | forceescape }} }">
 
   <div class="card p-5">
     <label for="preferred_tech" class="label">Preferred tech stack</label>

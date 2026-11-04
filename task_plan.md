@@ -1,70 +1,38 @@
-# Task Plan: Finnish Junior Tech Job Hunting Agent
+# Completion plan — JobHunt Finland
 
 ## Goal
-Build and deliver a job-hunting agent that surfaces the best junior-level tech positions in Finland through a web dashboard and alert bot, scoring opportunities by learning/growth potential, work-life/location fit, tech-stack match, and company quality.
 
-## Current Phase
-Phase 3 (more sources)
+Deliver the existing self-hosted job aggregation, ranking, profile and application-tracking app in this workspace. Repair real user flows rather than declaring completion from syntax/import checks. Preserve the user's data and unrelated work.
 
-## Phases
+## Completed in this repair
 
-### Phase 1: Requirements & Discovery
-- [x] Capture initial user intent
-- [x] Clarify scope, success criteria, and user preferences
-- [x] Research Finnish junior tech job landscape and source websites
-- [x] Document findings in findings.md
-- **Status:** complete
+- [x] Repair raw JavaScript and empty onboarding shown in the user's screenshot.
+- [x] Verify all five wizard steps and profile persistence in the connected browser using an isolated QA database.
+- [x] Escape Profile JSON and validate all JSON/form preference updates.
+- [x] Fix repeated multi-select filters, selected-field coverage, custom cities, sort and score pagination state.
+- [x] Cover saved/applied tracking, dates/notes, hide behavior and tracker deletion with isolated database-backed tests.
+- [x] Prevent stale pruning and deduplication from deleting tracked jobs; retain genuine separate-city openings.
+- [x] Make startup/manual refresh non-blocking, single-flight, bounded and observable.
+- [x] Find and repair the live SQLite locking issue; preserve backups and recovery files.
+- [x] Add WAL reader/writer concurrency and source-freshness preservation regressions.
+- [x] Repair The Hub's removed API using the allowed public Finnish listing pages and verify real returned rows.
+- [x] Make Shine's changed layout explicit as an upstream source failure.
+- [x] Disable restricted LinkedIn access by default.
+- [x] Repair PowerShell 7 startup and safe environment/setup defaults.
+- [x] Correct PWA root scope and keep APIs out of offline caches.
+- [x] Run 40 offline regression tests, Python/JS syntax checks and dependency consistency checks.
+- [x] Restart the real local app and verify real routes, source results and database integrity.
+- [x] Update README and STATUS with verified outcomes and limits.
+- [x] Complete the authorized filter/tracker browser click-through: multi-select/sort/search, Saved/Applied visibility, notes/dates/outcome, deletion, pagination, refresh draft retention and real-data isolation. Re-run the 40-test suite successfully.
 
-### Phase 2: Planning & Architecture
-- [x] Define agent capabilities (aggregate, filter, score, dashboard, alerts)
-- [x] Choose technical stack and delivery format
-- [x] Design data model and scoring/ranking logic
-- [x] Select MVP data source and access method
-- **Status:** complete
+## Not represented as completed
 
-### Phase 3: Expanded MVP Implementation
-- [x] Core Duunitori ingestion + scoring + dashboard
-- [x] Add The Hub source
-- [x] Add EnglishJobs.fi source
-- [x] Document LinkedIn / WorkinFinland limitations
-- [x] Editable preferences in dashboard
-- [x] Discord/Slack webhook alerts
-- [x] Improved salary extraction
-- [x] Company-level signals
-- [ ] Add Jobly/Monster source
-- [ ] Add Academic Work source
-- **Status:** in_progress
+- [ ] Physically test mobile installation/offline reading on a phone.
+- [ ] Verify email/Discord/Slack delivery using real authorized credentials.
+- [ ] Restore Shine through a permitted readable feed or rendering integration.
 
-### Phase 4: Testing & Delivery
-- [ ] Verify new sources work
-- [ ] Update documentation
-- [ ] Deliver to user
-- **Status:** pending
+These do not imply hosted cloud sync, multi-user accounts, additional authenticated boards, or employer application submissions. Those are outside this local-app repair.
 
-## Key Decisions from User
-| Decision | User Choice |
-|----------|-------------|
-| "Best" ranking criteria | Learning & growth first, work-life/location, tech-stack match |
-| Delivery format | Web dashboard + alert bot |
-| Target roles | Software/web dev, data/AI/ML, all junior tech roles (broad coverage) |
-| Immediate action | Build MVP, then add enhancements, then add more sources |
+## Key decisions retained
 
-## Technical Decisions
-| Decision | Rationale |
-|----------|-----------|
-| Python + FastAPI + SQLite | Fast MVP, zero-config persistence, async-friendly |
-| Duunitori + The Hub + EnglishJobs.fi + Jobly + Academic Work | Best balance of coverage and reliability |
-| Indeed/Oikotie/JobsinHelsinki/JobsinFinland/LinkedIn excluded | Blocked, JS-rendered, duplicated, or ToS-blocked |
-| Jinja2 server-rendered dashboard | No frontend build step |
-| Heuristic scoring | Transparent, no ML needed |
-| Console/email + webhook alerts | Flexible notification options |
-| Company signals from The Hub | Rich company metadata (size, founded, perks) |
-
-## Errors Encountered
-| Error | Attempt | Resolution |
-|-------|---------|------------|
-| (See previous plan versions) | | |
-
-## Notes
-- Need to respect robots.txt and terms of service for every source.
-- Detail-page scraping is capped to avoid overloading source sites.
+Python/FastAPI, SQLAlchemy/SQLite, server-rendered Jinja/Alpine, heuristic ranking weighted toward learning and work-life fit, local single-user storage, and optional console/email/webhook alerts. Source requests must respect terms, robots policies, cache windows and bounded request limits.

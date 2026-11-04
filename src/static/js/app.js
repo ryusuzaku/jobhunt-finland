@@ -70,61 +70,62 @@
   /* ---------- Refresh (fetch latest jobs) ---------- */
   var refreshBtn = document.getElementById("refresh-btn");
   var refreshIcon = document.getElementById("refresh-icon");
+  var statusText = document.getElementById("fetch-status");
+  var sourceList = document.getElementById("source-status");
+  var reloadBtn = document.getElementById("reload-jobs");
+  var pollTimer = null;
+  var watchedRefresh = false;
 
-  function skeletonCard() {
-    var el = document.createElement("article");
-    el.className = "card p-4 sm:p-5 skeleton-card";
-    el.innerHTML =
-      '<div class="flex items-start gap-4">' +
-      '<div class="flex-1 space-y-2">' +
-      '<div class="skeleton h-3 w-24 rounded-full"></div>' +
-      '<div class="skeleton h-5 w-3/4 rounded-lg"></div>' +
-      '<div class="skeleton h-3 w-1/3 rounded-full"></div>' +
-      '<div class="flex gap-2 pt-1">' +
-      '<div class="skeleton h-5 w-16 rounded-full"></div>' +
-      '<div class="skeleton h-5 w-20 rounded-full"></div>' +
-      "</div></div>" +
-      '<div class="skeleton h-14 w-14 rounded-full"></div>' +
-      "</div>";
-    return el;
+  function renderRefresh(data) {
+    var running = data.status === "running";
+    if (refreshBtn) refreshBtn.disabled = running;
+    if (refreshIcon) refreshIcon.classList.toggle("animate-spin", running);
+    if (statusText) statusText.textContent = running
+      ? "Refreshing jobs in the background — you can keep using the app."
+      : data.status === "error" ? data.error
+      : data.status === "success" ? "Last refresh: " + (data.new_jobs || 0) + " new jobs, " + (data.updated_jobs || 0) + " updated."
+      : "Ready to fetch jobs.";
+    if (sourceList) {
+      sourceList.replaceChildren();
+      Object.keys(data.sources || {}).forEach(function (name) {
+        var item = document.createElement("li");
+        var source = data.sources[name];
+        item.textContent = name + ": " + source.status + " (" + source.count + " jobs)";
+        sourceList.appendChild(item);
+      });
+    }
+    if (running) watchedRefresh = true;
+    if (watchedRefresh && !running) {
+      watchedRefresh = false;
+      toast(data.ok ? "Job refresh complete" : (data.error || "Job refresh failed"), data.ok ? "success" : "error");
+      if (reloadBtn && (location.pathname === "/" || location.pathname === "/bengaluru")) reloadBtn.classList.remove("hidden");
+    }
+    return running;
   }
 
-  if (refreshBtn) {
-    refreshBtn.addEventListener("click", function () {
-      if (refreshBtn.disabled) return;
-      refreshBtn.disabled = true;
-      if (refreshIcon) refreshIcon.classList.add("animate-spin");
-      var progress = toast("Fetching the latest jobs from all sources…", "progress", 0);
-
-      var list = document.getElementById("job-list");
-      var skeletons = [];
-      if (list) {
-        for (var i = 0; i < 3; i++) {
-          var sk = skeletonCard();
-          list.insertBefore(sk, list.firstChild);
-          skeletons.push(sk);
-        }
-      }
-
-      fetch("/fetch", { method: "POST" })
-        .then(function (r) { return r.json(); })
-        .then(function (data) {
-          if (progress) progress.remove();
-          var msg = data && data.ok
-            ? "Done — " + (data.new_jobs || 0) + " new jobs. Reloading…"
-            : "Fetch finished. Reloading…";
-          toast(msg, "success", 2000);
-          setTimeout(function () { location.reload(); }, 900);
-        })
-        .catch(function () {
-          if (progress) progress.remove();
-          skeletons.forEach(function (sk) { sk.remove(); });
-          toast("Fetch failed — check the server logs", "error");
-          refreshBtn.disabled = false;
-          if (refreshIcon) refreshIcon.classList.remove("animate-spin");
-        });
-    });
+  function monitorRefresh() {
+    clearTimeout(pollTimer);
+    fetch("/api/fetch/status", { cache: "no-store" })
+      .then(function (r) { if (!r.ok) throw new Error("Status unavailable"); return r.json(); })
+      .then(function (data) {
+        if (renderRefresh(data)) pollTimer = setTimeout(monitorRefresh, 2000);
+      })
+      .catch(function () {
+        if (statusText) statusText.textContent = "Refresh status unavailable. Check your connection or try again.";
+        if (refreshBtn) refreshBtn.disabled = false;
+        if (refreshIcon) refreshIcon.classList.remove("animate-spin");
+      });
   }
+  if (reloadBtn) reloadBtn.addEventListener("click", function () { location.reload(); });
+  if (refreshBtn) refreshBtn.addEventListener("click", function () {
+    if (refreshBtn.disabled) return;
+    refreshBtn.disabled = true;
+    fetch("/fetch", { method: "POST" })
+      .then(function (r) { if (!r.ok) throw new Error("Could not start refresh"); return r.json(); })
+      .then(function () { watchedRefresh = true; monitorRefresh(); })
+      .catch(function () { refreshBtn.disabled = false; toast("Could not start job refresh", "error"); });
+  });
+  monitorRefresh();
 
   /* ---------- PWA install prompt ---------- */
   var deferredPrompt = null;
@@ -148,7 +149,7 @@
   /* ---------- Service worker ---------- */
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", function () {
-      navigator.serviceWorker.register("/static/sw.js").catch(function () {});
+      navigator.serviceWorker.register("/static/sw.js", { scope: "/", updateViaCache: "none" }).catch(function () {});
     });
   }
 })();

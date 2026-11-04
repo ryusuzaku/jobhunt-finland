@@ -1,85 +1,41 @@
-/* JobHunt service worker — app shell precache + network-first runtime cache. */
-const VERSION = "v1";
+/* App shell + bounded offline page cache. Live API state is never cached. */
+const VERSION = "v2";
 const SHELL_CACHE = "jh-shell-" + VERSION;
 const RUNTIME_CACHE = "jh-runtime-" + VERSION;
-
 const SHELL_ASSETS = [
-  "/static/app.css",
-  "/static/vendor/alpine.min.js",
-  "/static/js/app.js",
-  "/static/js/profile.js",
-  "/static/fonts/inter-var.woff2",
-  "/static/favicon.svg",
-  "/static/manifest.webmanifest",
-  "/static/icons/icon-192.png",
-  "/static/icons/icon-512.png",
-  "/static/icons/icon-maskable-512.png",
-  "/offline",
+  "/static/app.css", "/static/vendor/alpine.min.js", "/static/js/app.js",
+  "/static/js/profile.js", "/static/js/onboarding.js", "/static/fonts/inter-var.woff2",
+  "/static/favicon.svg", "/static/manifest.webmanifest", "/static/icons/icon-192.png",
+  "/static/icons/icon-512.png", "/static/icons/icon-maskable-512.png", "/offline",
 ];
-
-self.addEventListener("install", (event) => {
-  event.waitUntil(
-    caches
-      .open(SHELL_CACHE)
-      .then((cache) => cache.addAll(SHELL_ASSETS))
-      .then(() => self.skipWaiting())
-  );
+self.addEventListener("install", event => {
+  event.waitUntil(caches.open(SHELL_CACHE).then(cache => cache.addAll(SHELL_ASSETS)).then(() => self.skipWaiting()));
 });
-
-self.addEventListener("activate", (event) => {
-  event.waitUntil(
-    caches
-      .keys()
-      .then((keys) =>
-        Promise.all(
-          keys
-            .filter((k) => k !== SHELL_CACHE && k !== RUNTIME_CACHE)
-            .map((k) => caches.delete(k))
-        )
-      )
-      .then(() => self.clients.claim())
-  );
+self.addEventListener("activate", event => {
+  event.waitUntil(caches.keys().then(keys => Promise.all(keys
+    .filter(key => key.startsWith("jh-") && key !== SHELL_CACHE && key !== RUNTIME_CACHE)
+    .map(key => caches.delete(key)))).then(() => self.clients.claim()));
 });
-
-self.addEventListener("fetch", (event) => {
-  const { request } = event;
-  if (request.method !== "GET") return;
-
+self.addEventListener("fetch", event => {
+  const request = event.request;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin) return;
-
-  // Static shell: cache-first.
+  if (request.method !== "GET" || url.origin !== self.location.origin) return;
+  if (url.pathname.startsWith("/api/") || url.pathname === "/health" || url.pathname === "/static/sw.js") return;
   if (url.pathname.startsWith("/static/")) {
-    event.respondWith(
-      caches.match(request).then(
-        (cached) =>
-          cached ||
-          fetch(request).then((response) => {
-            const copy = response.clone();
-            caches.open(SHELL_CACHE).then((cache) => cache.put(request, copy));
-            return response;
-          })
-      )
-    );
+    event.respondWith(caches.match(request).then(cached => cached || fetch(request).then(async response => {
+      if (response.ok) await (await caches.open(SHELL_CACHE)).put(request, response.clone());
+      return response;
+    })));
     return;
   }
-
-  // Pages & API: network-first, fall back to cache, then /offline.
-  event.respondWith(
-    fetch(request)
-      .then((response) => {
-        if (response.ok) {
-          const copy = response.clone();
-          caches.open(RUNTIME_CACHE).then((cache) => cache.put(request, copy));
-        }
-        return response;
-      })
-      .catch(() =>
-        caches.match(request).then((cached) => {
-          if (cached) return cached;
-          if (request.mode === "navigate") return caches.match("/offline");
-          return Response.error();
-        })
-      )
-  );
+  if (request.mode !== "navigate") return;
+  event.respondWith(fetch(request).then(async response => {
+    if (response.ok && !response.redirected) {
+      const cache = await caches.open(RUNTIME_CACHE);
+      await cache.put(request, response.clone());
+      const keys = await cache.keys();
+      for (const old of keys.slice(0, Math.max(0, keys.length - 50))) await cache.delete(old);
+    }
+    return response;
+  }).catch(async () => (await caches.match(request)) || (await caches.match("/offline")) || Response.error()));
 });

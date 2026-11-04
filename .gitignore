@@ -19,3 +19,8 @@ logs/
 .env
 
 tools/
+
+# Project-local validation, browser and runtime artifacts
+.work/
+.manus/
+.local/runtime/

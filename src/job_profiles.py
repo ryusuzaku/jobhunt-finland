@@ -22,7 +22,8 @@ JOB_PROFILES: dict[str, dict] = {
     "software": {
         "label": "Software / Backend", "icon": "💻", "group": "Tech",
         "title_keywords": ["software", "backend", "back-end", "full stack", "full-stack",
-                            "fullstack", "api developer", "server", "embedded"],
+                            "fullstack", "api developer", "server", "embedded", "developer",
+                            "programmer", "ohjelmist*", "sovelluskeh*"],
         "terms_fi": ["junior developer", "ohjelmistokehittäjä", "software developer", "backend developer"],
         "terms_en": ["software developer", "backend developer", "full stack developer"],
         "terms_in": ["software developer", "backend developer", "full stack developer"],

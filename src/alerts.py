@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from src.config import settings
 from src.models import Job
+from src.preferences import get_preferences
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +15,7 @@ logger = logging.getLogger(__name__)
 def get_alert_candidates(db: Session, threshold: float | None = None) -> list[Job]:
     """Return new, non-alerted jobs above the alert threshold, ordered by score."""
     if threshold is None:
-        threshold = settings.alert_threshold
+        threshold = get_preferences(db)["alert_threshold"]
     return (
         db.query(Job)
         .filter(Job.is_new == True, Job.alerted == False, Job.hidden == False)
